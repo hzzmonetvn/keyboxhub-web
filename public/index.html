@@ -1,0 +1,1095 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="docTitle">
+      Keybox Play Integrity Hub & Attestation Engine
+    </title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css?v=5.0" />
+  </head>
+  <body>
+    <a class="skip-link" href="#overview" data-i18n="skipContent"
+      >Đến nội dung chính</a
+    >
+    <!-- Toast Notification Container -->
+    <div id="toast-container" role="status" aria-live="polite"></div>
+
+    <!-- Header Navbar -->
+    <header class="navbar">
+      <div class="container nav-content">
+        <a href="/" class="logo-group">
+          <div class="logo-badge-icon">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              <path d="m9 12 2 2 4-4"></path>
+            </svg>
+          </div>
+          <div class="logo-title-group">
+            <span class="logo-text">Keybox <span>Hub</span></span>
+            <span class="logo-sub" data-i18n="navSubtitle"
+              >Play Integrity & Attestation Engine</span
+            >
+          </div>
+        </a>
+
+        <nav class="nav-links" aria-label="Navigation">
+          <a href="#overview" class="active" data-i18n="navOverview"
+            >Tổng quan</a
+          >
+          <a href="#repository" data-i18n="navRepository">Kho keybox</a>
+          <a href="#repair" data-i18n="navRepair">Sửa lỗi keybox</a>
+          <a href="#sources" data-i18n="navSources">Nguồn</a>
+          <a href="#api-docs">API</a>
+        </nav>
+        <div class="nav-actions">
+          <button
+            id="btn-lang-toggle"
+            class="btn btn-secondary btn-sm"
+            title="Switch Language / Chuyển Đổi Ngôn Ngữ"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path
+                d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              ></path>
+            </svg>
+            <span id="lang-label">EN</span>
+          </button>
+
+          <button
+            id="btn-loot-now"
+            class="btn btn-primary btn-sm"
+            title="Quét và loot key Strong mới từ các nguồn bên thứ 3 ngay"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="15"
+              height="15"
+              stroke="currentColor"
+              stroke-width="2.2"
+              fill="none"
+            >
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            <span class="btn-label" data-i18n="navBtnLoot"
+              >Loot Nguồn Thứ 3</span
+            >
+          </button>
+
+          <button
+            id="btn-refresh"
+            class="btn btn-secondary btn-sm"
+            title="Làm mới trạng thái và danh sách key"
+          >
+            <svg
+              class="refresh-icon"
+              viewBox="0 0 24 24"
+              width="15"
+              height="15"
+              stroke="currentColor"
+              stroke-width="2.2"
+              fill="none"
+            >
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path
+                d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+              ></path>
+            </svg>
+            <span class="btn-label" data-i18n="navBtnRefresh">Làm Mới</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container main-content" id="overview">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">KEYBOX MANAGEMENT</p>
+          <h1 data-i18n="pageTitle">Trung tâm Keybox</h1>
+          <p data-i18n="pageIntro">
+            Theo dõi trạng thái. Chia sẻ keybox. Kết nối cộng đồng.
+          </p>
+        </div>
+        <a class="heading-link" href="#api-docs"
+          ><span data-i18n="viewDocs">Tài liệu API</span>
+          <span aria-hidden="true">↗</span></a
+        >
+      </div>
+      <!-- Hero Status Overview -->
+      <section class="hero-status-card" aria-label="Keybox status">
+        <div class="status-main">
+          <div class="badge-subtitle">
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span data-i18n="heroSubtitleText"
+              >Trạng thái cấp phát hiện tại</span
+            >
+          </div>
+
+          <div class="status-badge-wrapper">
+            <div
+              id="system-status-badge"
+              class="status-badge status-loading"
+              role="status"
+            >
+              <span class="status-dot"></span>
+              <span id="system-status-text" data-i18n="statusChecking"
+                >Đang kiểm tra...</span
+              >
+            </div>
+          </div>
+
+          <p
+            class="status-description"
+            id="system-status-desc"
+            data-i18n="heroConnecting"
+          >
+            Đang kết nối tới máy chủ Google Attestation và hệ thống quản lý
+            keybox...
+          </p>
+
+          <div class="status-meta-pills">
+            <div class="meta-pill">
+              <svg
+                viewBox="0 0 24 24"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span data-i18n="metaUpdated">Cập nhật:</span>
+              <strong id="last-updated-time">---</strong>
+            </div>
+            <div class="meta-pill">
+              <svg
+                viewBox="0 0 24 24"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+              <span data-i18n="metaAutoLoot">Auto-Loot:</span>
+              <strong id="last-looted-time">---</strong>
+            </div>
+            <div class="meta-pill">
+              <svg
+                viewBox="0 0 24 24"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+                ></path>
+              </svg>
+              <span data-i18n="metaCycle">Chu kỳ:</span>
+              <strong data-i18n="metaCycleVal">1 Giờ / Lần</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="integrity-art" aria-hidden="true">
+          <div class="orbit orbit-one"></div>
+          <div class="orbit orbit-two"></div>
+          <span class="orbit-point point-one"></span
+          ><span class="orbit-point point-two"></span>
+          <div class="shield-core">
+            <svg viewBox="0 0 64 72" fill="none">
+              <path
+                d="M32 4 57 14v20c0 17-25 33-25 33S7 51 7 34V14L32 4Z"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+              <path
+                d="m22 34 7 7 15-16"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+          <span class="art-caption">PLAY INTEGRITY</span>
+        </div>
+      </section>
+
+      <div class="stats-grid">
+        <div class="stat-card metric-0">
+          <span class="stat-icon" aria-hidden="true">✓</span>
+          <span class="stat-value text-success" id="stat-strong">0</span>
+          <span class="stat-label" data-i18n="statStrong"
+            >Strong Integrity</span
+          >
+          <span class="stat-hint" data-i18n="statStrongHint"></span>
+        </div>
+        <div class="stat-card metric-1">
+          <span class="stat-icon" aria-hidden="true">◈</span>
+          <span class="stat-value text-warning" id="stat-device">0</span>
+          <span class="stat-label" data-i18n="statDevice"
+            >Device Integrity</span
+          >
+          <span class="stat-hint" data-i18n="statDeviceHint"></span>
+        </div>
+        <div class="stat-card metric-2">
+          <span class="stat-icon" aria-hidden="true">⊘</span>
+          <span class="stat-value text-danger" id="stat-banned">0</span>
+          <span class="stat-label" data-i18n="statBanned"
+            >Bị Ban (Xóa sau 24h)</span
+          >
+          <span class="stat-hint" data-i18n="statBannedHint"></span>
+        </div>
+        <div class="stat-card metric-3">
+          <span class="stat-icon" aria-hidden="true">#</span>
+          <span class="stat-value text-primary" id="stat-total">0</span>
+          <span class="stat-label" data-i18n="statTotal">Tổng Keybox</span>
+          <span class="stat-hint" data-i18n="statTotalHint"></span>
+        </div>
+      </div>
+
+      <!-- Quick Action Cards: Download & Upload -->
+      <section class="action-grid">
+        <!-- Download Card -->
+        <div class="card download-card" id="download">
+          <div class="card-header">
+            <div class="card-header-left">
+              <div class="icon-circle icon-download">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="22"
+                  height="22"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+              </div>
+              <div>
+                <h3 data-i18n="downloadTitle">Tải Keybox Ngẫu Nhiên</h3>
+                <p data-i18n="downloadDesc">
+                  Cấp phát file XML khả dụng.
+                  <strong>Luôn ưu tiên cấp key Strong</strong> trước, tự động
+                  chuyển sang Device nếu hết key Strong.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div class="download-file">
+              <div class="file-symbol" aria-hidden="true">
+                &lt;/&gt;<span>XML</span>
+              </div>
+              <div>
+                <strong>keybox.xml</strong
+                ><span data-i18n="fileDescription"
+                  >Android Attestation · Tệp chứng thực</span
+                >
+              </div>
+              <span class="file-extension">.xml</span>
+            </div>
+            <div class="priority-note">
+              <span aria-hidden="true">↳</span>
+              <span data-i18n="priorityNote"
+                >Ưu tiên Strong Integrity, dự phòng Device.</span
+              >
+            </div>
+
+            <div class="button-group">
+              <a
+                href="/api/download"
+                class="btn btn-primary btn-lg"
+                id="btn-download-main"
+                download="keybox.xml"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span id="btn-download-label" data-i18n="downloadBtn"
+                  >Tải keybox.xml (Ưu tiên Strong)</span
+                >
+              </a>
+              <button class="btn btn-secondary btn-lg" id="btn-copy-xml">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path
+                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                  ></path>
+                </svg>
+                <span data-i18n="copyXmlBtn">Sao Chép XML</span>
+              </button>
+            </div>
+            <div class="api-hint">
+              <span data-i18n="apiHintDownload">API cURL:</span>
+              <code
+                >curl -L -o keybox.xml
+                https://keybox.hzzmonet.io.vn/api/download</code
+              >
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="card upload-card" id="contribute">
+          <div class="card-header">
+            <div class="card-header-left">
+              <div class="icon-circle icon-upload">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="22"
+                  height="22"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <div>
+                <h3 data-i18n="uploadTitle">Đóng Góp & Kiểm Tra Keybox</h3>
+                <p data-i18n="uploadDesc">
+                  Tải lên từ file đơn/ZIP, dán mã XML hoặc
+                  <strong>nhập trực tiếp link URL</strong>. Tự động bỏ qua trùng
+                  lặp.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div
+              class="tabs-segmented"
+              role="tablist"
+              aria-label="Upload method"
+            >
+              <button
+                class="tab-btn active"
+                data-tab="file"
+                id="upload-tab-file"
+                role="tab"
+                aria-controls="tab-file"
+                aria-selected="true"
+                tabindex="0"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                  ></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <span data-i18n="tabFile">File (XML / ZIP)</span>
+              </button>
+              <button
+                class="tab-btn"
+                data-tab="url"
+                id="upload-tab-url"
+                role="tab"
+                aria-controls="tab-url"
+                aria-selected="false"
+                tabindex="-1"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
+                  ></path>
+                  <path
+                    d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
+                  ></path>
+                </svg>
+                <span data-i18n="tabUrl">Nhập Link URL</span>
+              </button>
+              <button
+                class="tab-btn"
+                data-tab="text"
+                id="upload-tab-text"
+                role="tab"
+                aria-controls="tab-text"
+                aria-selected="false"
+                tabindex="-1"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                  <line x1="9" y1="20" x2="15" y2="20"></line>
+                  <line x1="12" y1="4" x2="12" y2="20"></line>
+                </svg>
+                <span data-i18n="tabText">Dán Mã XML</span>
+              </button>
+            </div>
+
+            <div
+              class="tab-content"
+              id="tab-file"
+              role="tabpanel"
+              aria-labelledby="upload-tab-file"
+            >
+              <div
+                class="drop-zone"
+                id="drop-zone"
+                role="button"
+                tabindex="0"
+                data-i18n-aria="chooseFiles"
+                aria-label="Chọn file XML hoặc ZIP"
+              >
+                <input
+                  type="file"
+                  id="file-input"
+                  accept=".xml,.zip,application/zip,text/xml"
+                  multiple
+                  hidden
+                />
+                <svg
+                  viewBox="0 0 24 24"
+                  width="38"
+                  height="38"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                  ></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="12" y1="18" x2="12" y2="12"></line>
+                  <polyline points="9 15 12 12 15 15"></polyline>
+                </svg>
+                <p class="drop-text" data-i18n="dropText">
+                  Kéo thả file .xml hoặc .zip vào đây
+                </p>
+                <span class="browse-link" data-i18n="browseText"
+                  >Chọn từ thiết bị</span
+                ><span class="drop-helper" data-i18n="dropHelper"
+                  >XML hoặc ZIP · Hỗ trợ nhiều file</span
+                >
+                <span class="file-name-display" id="file-name-display"></span>
+              </div>
+            </div>
+
+            <div
+              class="tab-content hidden"
+              id="tab-url"
+              role="tabpanel"
+              aria-labelledby="upload-tab-url"
+            >
+              <input
+                type="url"
+                id="keybox-url-input"
+                data-i18n-aria="tabUrl"
+                class="input-styled"
+                placeholder="https://raw.githubusercontent.com/.../keybox.xml hoặc link Pastebin..."
+              />
+              <p class="input-helper-text" data-i18n="urlHelperText">
+                Hệ thống sẽ tải file từ link, tự động nhận diện định dạng
+                (XML/Base64/Specter Scrambled) và xác thực với Google.
+              </p>
+            </div>
+
+            <div
+              class="tab-content hidden"
+              id="tab-text"
+              role="tabpanel"
+              aria-labelledby="upload-tab-text"
+            >
+              <textarea
+                id="xml-text-input"
+                data-i18n-aria="tabText"
+                class="input-styled"
+                placeholder="Dán nội dung XML của keybox tại đây (<AndroidAttestation>...)"
+                rows="5"
+              ></textarea>
+            </div>
+
+            <div class="upload-action-row">
+              <button class="btn btn-primary" id="btn-submit-upload">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M12 5v14M5 12h14"></path>
+                </svg>
+                <span data-i18n="btnUploadSubmit">Kiểm Tra & Tải Lên</span>
+              </button>
+              <div
+                id="upload-status"
+                role="status"
+                class="upload-feedback"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Keybox Repair & Normalization Section -->
+      <section class="card repair-card" id="repair">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="icon-circle icon-repair">
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+              >
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 data-i18n="repairTitle">Sửa Lỗi & Chuẩn Hóa Keybox</h3>
+              <p data-i18n="repairDesc">
+                Tự động sửa lỗi cấu trúc, sắp xếp chuỗi Leaf &rarr; Intermediate &rarr; Root, bổ sung Google Root CA còn thiếu, chuyển đổi SEC1/PKCS#1, ngắt dòng 64 ký tự chuẩn RFC để tương thích 100% với TrickyStore, APatch, KernelSU, Chiteroman PIF.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="tabs-segmented" role="tablist" aria-label="Repair input method">
+            <button class="tab-btn active" data-repair-tab="upload" id="repair-tab-upload" role="tab" aria-selected="true" tabindex="0">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              <span data-i18n="repairTabUpload">Tải File (XML / TXT)</span>
+            </button>
+            <button class="tab-btn" data-repair-tab="paste" id="repair-tab-paste" role="tab" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                <line x1="9" y1="20" x2="15" y2="20"></line>
+                <line x1="12" y1="4" x2="12" y2="20"></line>
+              </svg>
+              <span data-i18n="repairTabPaste">Dán Mã XML / PEM</span>
+            </button>
+          </div>
+
+          <div class="tab-content" id="repair-content-upload">
+            <div class="drop-zone" id="repair-drop-zone" role="button" tabindex="0">
+              <input type="file" id="repair-file-input" accept=".xml,.txt,text/xml,text/plain" hidden />
+              <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <p class="drop-text" data-i18n="repairDropText">Kéo thả file keybox bị lỗi vào đây</p>
+              <span class="browse-link" data-i18n="browseText">chọn từ thiết bị</span>
+              <span class="file-name-display" id="repair-file-name-display"></span>
+            </div>
+          </div>
+
+          <div class="tab-content hidden" id="repair-content-paste">
+            <textarea id="repair-text-input" class="input-styled font-mono" placeholder="Dán nội dung keybox bị lỗi hoặc các khối PEM tại đây..." rows="6"></textarea>
+          </div>
+
+          <div class="upload-action-row">
+            <button class="btn btn-primary" id="btn-submit-repair">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+              </svg>
+              <span data-i18n="btnRepairSubmit">Sửa Lỗi & Chuẩn Hóa Ngay</span>
+            </button>
+            <div id="repair-status" role="status" class="upload-feedback"></div>
+          </div>
+
+          <!-- Repair Output Panel (Shown when repair is successful) -->
+          <div id="repair-output-panel" class="repair-output-panel hidden">
+            <div class="repair-result-banner">
+              <div class="repair-badge-row">
+                <span class="badge badge-success" data-i18n="repairSuccessBadge">Đã Chuẩn Hóa Thành Công</span>
+                <span class="badge badge-device" id="repair-fixes-count">0 lỗi đã sửa</span>
+                <span class="badge badge-outline" id="repair-device-id">Device: ---</span>
+              </div>
+              <h4 data-i18n="repairAppliedTitle" style="margin-top:12px; margin-bottom:6px; font-size:14px;">Các lỗi đã được tự động xử lý:</h4>
+              <ul id="repair-fixes-list" class="repair-fixes-list"></ul>
+            </div>
+
+            <div class="repair-xml-preview-container">
+              <div class="preview-header">
+                <span class="preview-title" data-i18n="repairPreviewTitle">Keybox Đã Chuẩn Hóa (keybox.xml)</span>
+                <div class="preview-actions">
+                  <button class="btn btn-secondary btn-sm" id="btn-copy-repaired-xml">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <span data-i18n="copyXmlBtn">Sao Chép XML</span>
+                  </button>
+                  <button class="btn btn-primary btn-sm" id="btn-download-repaired-xml">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="17 8 12 3 7 8"></polyline>
+                      <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span data-i18n="downloadRepairedBtn">Tải keybox.xml Đã Sửa</span>
+                  </button>
+                </div>
+              </div>
+              <pre class="code-preview" id="repair-xml-code"></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Upload Validation Result Modal -->
+      <section id="analysis-result-panel" class="card result-card hidden">
+        <div class="card-header">
+          <div class="card-header-left">
+            <h3 data-i18n="resultTitle">Kết Quả Kiểm Tra Chi Tiết</h3>
+          </div>
+          <button class="btn-close" id="btn-close-result" title="Đóng">
+            &times;
+          </button>
+        </div>
+        <div class="card-body" id="analysis-result-body"></div>
+      </section>
+
+      <!-- Keybox Database Table Card -->
+      <section class="card table-card" id="repository">
+        <div class="table-toolbar">
+          <div class="table-title-group">
+            <div class="table-heading">
+              <h3 data-i18n="tableTitle">Kho Keybox</h3>
+              <span id="keys-count" class="count-badge" aria-live="polite"
+                >—</span
+              >
+            </div>
+            <p data-i18n="tableSubtitle">
+              Tự động cập nhật & auto-loot mỗi 1 giờ.
+              <em>Key bị thu hồi tự động xóa sau 24h. Bỏ qua trùng lặp.</em>
+            </p>
+          </div>
+
+          <div class="table-filter-bar">
+            <div class="search-input-box">
+              <svg
+                viewBox="0 0 24 24"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="text"
+                id="table-search-input"
+                data-i18n-aria="searchPlaceholder"
+                class="search-input"
+                placeholder="Tìm theo Device ID..."
+              />
+            </div>
+
+            <div class="filter-pills">
+              <button
+                class="filter-pill active"
+                data-filter="all"
+                data-i18n="filterAll"
+              >
+                Tất cả
+              </button>
+              <button class="filter-pill" data-filter="strong">Strong</button>
+              <button class="filter-pill" data-filter="device">Device</button>
+              <button
+                class="filter-pill"
+                data-filter="banned"
+                data-i18n="filterBanned"
+              >
+                Bị Ban
+              </button>
+            </div>
+
+            <button
+              class="btn btn-secondary btn-sm"
+              id="btn-check-now"
+              title="Kiểm tra lại toàn bộ với Google ngay"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              <span data-i18n="btnCheckAll">Kiểm Tra Toàn Bộ</span>
+            </button>
+          </div>
+        </div>
+
+        <p class="table-scroll-hint" data-i18n="tableScrollHint">
+          Vuốt ngang bảng để xem trạng thái và thao tác →
+        </p>
+        <div
+          class="table-responsive"
+          tabindex="0"
+          role="region"
+          data-i18n-aria="scrollTable"
+          aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"
+        >
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-i18n="thId">ID</th>
+                <th data-i18n="thDevice">Device ID</th>
+                <th data-i18n="thSerial">Serial</th>
+                <th data-i18n="thAlg">Thuật toán</th>
+                <th data-i18n="thStatus">Trạng thái</th>
+                <th data-i18n="thSource">Nguồn gốc</th>
+                <th data-i18n="thReport">Báo cáo Device</th>
+                <th data-i18n="thUploaded">Tải lên lúc</th>
+                <th data-i18n="thPurge">Hạn xóa (nếu bị ban)</th>
+                <th data-i18n="thActions">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="keys-table-body">
+              <tr>
+                <td
+                  colspan="9"
+                  class="text-center py-4"
+                  data-i18n="loadingKeys"
+                >
+                  Đang tải danh sách keybox...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 3rd Party Sources Card -->
+      <section class="card table-card" id="sources">
+        <div class="table-toolbar">
+          <div class="card-header-left">
+            <div class="icon-circle icon-source">
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path
+                  d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"
+                ></path>
+              </svg>
+            </div>
+            <div>
+              <h3 data-i18n="sourcesTitle">
+                Nguồn Keybox Bên Thứ 3 (Auto-Looter)
+              </h3>
+              <p data-i18n="sourcesDesc">
+                Hệ thống tự động quét mỗi 1 tiếng:
+                <strong>nếu Strong thì Loot, nếu trùng thì Skip</strong>.
+              </p>
+            </div>
+          </div>
+
+          <button
+            class="btn btn-primary btn-sm"
+            id="btn-loot-table"
+            title="Quét và loot ngay từ tất cả các nguồn"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              stroke="currentColor"
+              stroke-width="2"
+              fill="none"
+            >
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            <span class="btn-label" data-i18n="btnLootNowTable">Loot Ngay</span>
+          </button>
+        </div>
+
+        <!-- Add New Source Bar -->
+        <div class="source-add-bar">
+          <input
+            type="url"
+            id="input-new-source-url"
+            data-i18n-aria="inputSourceUrlPlaceholder"
+            class="source-input-url"
+            placeholder="Nhập link nguồn mới (VD: https://raw.githubusercontent.com/.../keybox.xml)"
+          />
+          <input
+            type="text"
+            id="input-new-source-name"
+            data-i18n-aria="inputSourceNamePlaceholder"
+            class="source-input-name"
+            placeholder="Tên nguồn (tùy chọn)"
+          />
+          <button id="btn-submit-source" class="btn btn-primary btn-sm">
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span data-i18n="btnAddSource">Thêm Nguồn & Quét</span>
+          </button>
+        </div>
+
+        <p class="table-scroll-hint" data-i18n="tableScrollHint">
+          Vuốt ngang bảng để xem trạng thái và thao tác →
+        </p>
+        <div
+          class="table-responsive"
+          tabindex="0"
+          role="region"
+          data-i18n-aria="scrollTable"
+          aria-label="Bảng dữ liệu, cuộn ngang để xem thêm"
+        >
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-i18n="thSrcName">Nguồn</th>
+                <th data-i18n="thSrcType">Loại</th>
+                <th data-i18n="thSrcUrl">Địa chỉ URL</th>
+                <th data-i18n="thSrcStatus">Trạng thái quét</th>
+                <th data-i18n="thSrcLast">Lần quét gần nhất</th>
+              </tr>
+            </thead>
+            <tbody id="sources-table-body">
+              <tr>
+                <td
+                  colspan="5"
+                  class="text-center py-3"
+                  data-i18n="loadingSources"
+                >
+                  Đang tải danh sách nguồn...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- API Reference Documentation Card -->
+      <section class="card api-docs-card" id="api-docs">
+        <div class="card-header">
+          <div class="card-header-left">
+            <h3 data-i18n="apiDocsTitle">Tài Liệu API & Hướng Dẫn Tích Hợp</h3>
+            <p data-i18n="apiDocsDesc">
+              Tích hợp vào script bash, Cronjob, PlayIntegrityFix, TrickyStore
+              hoặc module KernelSU/Magisk
+            </p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="api-endpoint-item">
+            <div class="api-method-row">
+              <span class="badge badge-get">GET</span>
+              <code>/api/download</code>
+              <span class="api-desc" data-i18n="apiDescDownload"
+                >Tải ngẫu nhiên 1 file keybox.xml khả dụng (Ưu tiên Strong
+                &rarr; Device)</span
+              >
+            </div>
+            <pre
+              class="code-snippet"
+            ><code>curl -L -o keybox.xml https://keybox.hzzmonet.io.vn/api/download</code></pre>
+          </div>
+
+          <div class="api-endpoint-item">
+            <div class="api-method-row">
+              <span class="badge badge-post">POST</span>
+              <code>/api/loot</code>
+              <span class="api-desc" data-i18n="apiDescLoot"
+                >Kích hoạt fetch nguồn bên thứ 3 và tự động loot key Strong (bỏ
+                qua trùng)</span
+              >
+            </div>
+            <pre
+              class="code-snippet"
+            ><code>curl -X POST https://keybox.hzzmonet.io.vn/api/loot</code></pre>
+          </div>
+
+          <div class="api-endpoint-item">
+            <div class="api-method-row">
+              <span class="badge badge-post">POST</span>
+              <code>/api/upload</code>
+              <span class="api-desc" data-i18n="apiDescUpload"
+                >Upload đơn lẻ, nhiều file, ZIP hoặc qua link URL (Tự bỏ qua
+                trùng lặp)</span
+              >
+            </div>
+            <pre
+              class="code-snippet"
+            ><code># 1. Upload qua đường link trực tiếp (URL):
+curl -X POST -H "Content-Type: application/json" -d '{"url": "https://example.com/keybox.xml"}' https://keybox.hzzmonet.io.vn/api/upload
+
+# 2. Upload file nén ZIP hoặc file XML:
+curl -F "files=@my_keyboxes.zip" https://keybox.hzzmonet.io.vn/api/upload</code></pre>
+          </div>
+
+          <div class="api-endpoint-item">
+            <div class="api-method-row">
+              <span class="badge badge-get">GET</span>
+              <code>/api/status</code>
+              <span class="api-desc" data-i18n="apiDescStatus"
+                >Kiểm tra trạng thái hệ thống (strong / device / banned)</span
+              >
+            </div>
+            <pre
+              class="code-snippet"
+            ><code>curl https://keybox.hzzmonet.io.vn/api/status</code></pre>
+          </div>
+
+          <div class="api-endpoint-item">
+            <div class="api-method-row">
+              <span class="badge badge-post">POST</span>
+              <code>/api/report</code>
+              <span class="api-desc" data-i18n="apiDescReport"
+                >Báo cáo key bị hạ cấp xuống Device (trên 5 phiếu chuyển sang device)</span
+              >
+            </div>
+            <pre
+              class="code-snippet"
+            ><code>curl -X POST -H "Content-Type: application/json" -d '{"id": 1}' https://keybox.hzzmonet.io.vn/api/report</code></pre>
+          </div>
+
+          <div class="api-endpoint-item">
+            <div class="api-method-row">
+              <span class="badge badge-post">POST</span>
+              <code>/api/repair</code>
+              <span class="api-desc" data-i18n="apiDescRepair"
+                >Sửa lỗi & chuẩn hóa keybox (sắp xếp chuỗi cert, bổ sung Google Root, ngắt dòng 64 ký tự PEM)</span
+              >
+            </div>
+            <pre
+              class="code-snippet"
+            ><code># 1. Gửi file bị lỗi và nhận lại keybox.xml chuẩn hóa:
+curl -F "file=@broken_keybox.xml" "https://keybox.hzzmonet.io.vn/api/repair?download=true" -o keybox_repaired.xml
+
+# 2. Gửi raw XML và nhận JSON chẩn đoán kèm danh sách lỗi đã sửa:
+curl -X POST -H "Content-Type: application/xml" --data-binary @broken.xml https://keybox.hzzmonet.io.vn/api/repair</code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-content">
+        <span class="footer-brand"
+          >Keybox<span>Hub</span
+          ><span class="footer-version"> / v5.0</span></span
+        >
+        <p data-i18n="footerText">
+          Keybox Hub &bull; Powered by
+          <a
+            href="https://github.com/tiann/KeyBoxChecker"
+            target="_blank"
+            rel="noopener"
+            >KeyBoxChecker</a
+          >
+          &bull; Periodic Google CRL Recheck & 3rd-Party Auto-Looter &bull; 24h
+          Auto-Purge
+        </p>
+      </div>
+    </footer>
+
+    <script src="app.js?v=5.0"></script>
+  </body>
+</html>
