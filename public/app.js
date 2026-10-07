@@ -61,7 +61,6 @@ const translations = {
     tableSubtitle: "Tìm và tải keybox theo trạng thái. Key bị thu hồi được giữ lại trong 24 giờ.",
     searchPlaceholder: "Tìm ID, thiết bị, nguồn…",
     filterAll: "Tất cả",
-    filterBanned: "Thu hồi",
     btnCheckAll: "Kiểm tra toàn bộ",
     thId: "ID",
     thDevice: "Device ID",
@@ -197,7 +196,6 @@ const translations = {
     tableSubtitle: "Find and download keys by status. Revoked keys remain visible for 24 hours.",
     searchPlaceholder: "Search ID, device, source…",
     filterAll: "All",
-    filterBanned: "Revoked",
     btnCheckAll: "Recheck all keys",
     thId: "ID",
     thDevice: "Device ID",
@@ -689,7 +687,7 @@ async function loadKeys() {
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    allKeysData = data.keys || [];
+    allKeysData = (data.keys || []).filter(k => k.status !== "banned");
     renderKeysTable();
   } catch (err) {
     console.error("Error loading keys:", err);

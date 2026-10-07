@@ -6,6 +6,8 @@ Thông báo được gửi khi upload hoặc tự lấy key mới từ nguồn n
 chuyển sang banned, và khi trạng thái Strong/Device/softban thay đổi hoặc phục hồi.
 Key trùng bị bỏ qua và kiểm tra lại không có thay đổi sẽ không gửi thông báo.
 Key mới đã banned chỉ gửi một sự kiện `keybox.added` với `status: "banned"`.
+Key bị ban được loại khỏi danh sách trên web ở lần cập nhật tiếp theo (tự động
+mỗi 30 giây). Metadata vẫn có trong API trong 24 giờ trước khi tự xóa.
 
 Sao chép `.env.example` thành `.env` và điền các kênh cần dùng:
 
