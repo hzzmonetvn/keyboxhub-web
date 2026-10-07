@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { getNotificationTargets } from "./notification-settings.js";
 
 async function postNotification(channel, url, body, headers = {}) {
   try {
@@ -11,21 +12,31 @@ async function postNotification(channel, url, body, headers = {}) {
     });
     if (!response.ok) {
       console.warn(`[Notifications] ${channel} failed: HTTP ${response.status}`);
-      return;
+      return { channel, success: false, error: `HTTP ${response.status}` };
     }
     if (channel === "Telegram" && (await response.json()).ok !== true) {
       console.warn("[Notifications] Telegram rejected the message");
+      return { channel, success: false, error: "Message rejected" };
     }
+    return { channel, success: true };
   } catch {
     console.warn(`[Notifications] ${channel} delivery failed`);
+    return { channel, success: false, error: "Delivery failed" };
   }
 }
 
 export async function notifyKeyboxEvent(event, keybox, previousStatus = null, systemStatus = {}) {
-  const webhookUrl = process.env.KEYBOX_WEBHOOK_URL;
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!webhookUrl && !(botToken && chatId)) return;
+  const results = await Promise.all(getNotificationTargets().map(config =>
+    sendKeyboxNotification(config, event, keybox, previousStatus, systemStatus)
+  ));
+  return results.flat();
+}
+
+export async function sendKeyboxNotification(config, event, keybox, previousStatus = null, systemStatus = {}) {
+  const webhookUrl = config.webhook_enabled ? config.webhook_url : "";
+  const botToken = config.telegram_enabled ? config.telegram_bot_token : "";
+  const chatId = config.telegram_chat_id;
+  if (!webhookUrl && !(botToken && chatId)) return [];
 
   const payload = {
     event_id: randomUUID(),
@@ -46,13 +57,14 @@ export async function notifyKeyboxEvent(event, keybox, previousStatus = null, sy
   };
   const deliveries = [];
   if (webhookUrl) {
-    const headers = process.env.KEYBOX_WEBHOOK_TOKEN
-      ? { Authorization: `Bearer ${process.env.KEYBOX_WEBHOOK_TOKEN}` }
+    const headers = config.webhook_token
+      ? { Authorization: `Bearer ${config.webhook_token}` }
       : {};
     deliveries.push(postNotification("Webhook", webhookUrl, payload, headers));
   }
   if (botToken && chatId) {
-    const title = event === "keybox.added" ? "Keybox mới được thêm"
+    const title = event === "keybox.test" ? "Thông báo thử"
+      : event === "keybox.added" ? "Keybox mới được thêm"
       : event === "keybox.banned" ? "Keybox vừa bị ban" : "Keybox đổi trạng thái";
     const status = previousStatus ? `${previousStatus} → ${keybox.status}` : keybox.status;
     const text = [
@@ -69,5 +81,5 @@ export async function notifyKeyboxEvent(event, keybox, previousStatus = null, sy
       text
     }));
   }
-  await Promise.all(deliveries);
+  return Promise.all(deliveries);
 }

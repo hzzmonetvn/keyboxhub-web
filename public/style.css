@@ -439,6 +439,86 @@ h1 {
   border-radius: 14px;
   padding: 25px;
 }
+.notification-unlock {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.notification-unlock p {
+  grid-column: 1 / -1;
+}
+.notification-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 20px;
+}
+.notification-grid fieldset {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.notification-grid legend {
+  padding: 0 6px;
+}
+.notification-grid label {
+  display: block;
+  margin: 12px 0 8px;
+}
+.notification-grid .notification-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.notification-help,
+.notification-unlock p {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.8;
+  margin-top: 12px;
+}
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.notification-admin {
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+  padding-top: 20px;
+}
+.notification-admin summary {
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+.notification-subscribers {
+  list-style: none;
+  margin: 16px 0;
+}
+.notification-subscribers li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+#notification-issued label {
+  display: block;
+}
+#notification-copy-token {
+  margin-top: 8px;
+}
+@media (max-width: 600px) {
+  .notification-unlock,
+  .notification-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .card-header {
   display: flex;
   align-items: flex-start;

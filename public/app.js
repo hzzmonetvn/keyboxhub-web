@@ -7,6 +7,39 @@ let searchQuery = "";
 // Internationalization (i18n) Dictionary
 const translations = {
   vi: {
+    notificationsNav: "Thông báo",
+    notificationsTitle: "Webhook & Telegram",
+    notificationsDesc: "Nhận tin khi có key mới, key bị ban hoặc đổi trạng thái.",
+    notificationsAdmin: "Token truy cập",
+    notificationsUnlock: "Mở cấu hình",
+    notificationsAdminHelp: "Nhập token do admin cấp để lưu webhook hoặc Telegram của riêng bạn.",
+    notificationsWebhookEnable: "Bật webhook",
+    notificationsTelegramEnable: "Bật Telegram",
+    notificationsWebhookToken: "Webhook token (tùy chọn)",
+    notificationsHelp: "Để trống token để giữ token đã lưu. Tạo bot bằng @BotFather, nhắn /start hoặc thêm bot vào nhóm/kênh và cấp quyền gửi tin.",
+    notificationsSave: "Lưu cấu hình",
+    notificationsTest: "Gửi thử cấu hình đã lưu",
+    notificationsSaved: "Đã lưu cấu hình. Thay đổi có hiệu lực ngay.",
+    notificationsLoaded: "Đã mở cấu hình.",
+    notificationsSecretSaved: "Đã lưu token — để trống để giữ nguyên",
+    notificationsWorking: "Đang xử lý…",
+    notificationsUnauthorized: "Token không đúng hoặc đã bị thu hồi.",
+    notificationsNoChannels: "Hãy bật và lưu ít nhất một kênh trước khi gửi thử.",
+    notificationsTestSuccess: "Gửi thành công",
+    notificationsTestFailed: "Gửi thất bại",
+    notificationsAdminTitle: "Quản trị token",
+    notificationsPassword: "Mật khẩu quản trị",
+    notificationsLogin: "Đăng nhập",
+    notificationsLogout: "Đăng xuất",
+    notificationsSubscriberName: "Tên người nhận",
+    notificationsIssue: "Cấp token",
+    notificationsRevoke: "Thu hồi",
+    notificationsRevokeConfirm: "Thu hồi token này và ngừng gửi thông báo cho người nhận?",
+    notificationsTokenOnce: "Token chỉ hiển thị một lần. Sao chép và gửi cho người nhận.",
+    notificationsCopyToken: "Sao chép token",
+    notificationsCopied: "Đã sao chép token.",
+    notificationsAdminUnauthorized: "Mật khẩu sai hoặc phiên đăng nhập đã hết hạn.",
+    notificationsNoTokens: "Chưa cấp token nào.",
     tableScrollHint: "Vuốt ngang bảng để xem trạng thái và thao tác →",
     connectionError: "Mất kết nối",
     dropHelper: "XML hoặc ZIP · Hỗ trợ nhiều file",
@@ -142,6 +175,39 @@ const translations = {
     repairNoContentPrompt: "Vui lòng chọn file hoặc dán nội dung keybox cần sửa lỗi!"
   },
   en: {
+    notificationsNav: "Notifications",
+    notificationsTitle: "Webhook & Telegram",
+    notificationsDesc: "Get notified about new keys, banned keys and status changes.",
+    notificationsAdmin: "Access token",
+    notificationsUnlock: "Open settings",
+    notificationsAdminHelp: "Enter an admin-issued token to save your own webhook or Telegram settings.",
+    notificationsWebhookEnable: "Enable webhook",
+    notificationsTelegramEnable: "Enable Telegram",
+    notificationsWebhookToken: "Webhook token (optional)",
+    notificationsHelp: "Leave tokens blank to keep saved tokens. Create a bot with @BotFather, send /start or add it to your group/channel and allow it to send messages.",
+    notificationsSave: "Save settings",
+    notificationsTest: "Test saved settings",
+    notificationsSaved: "Settings saved. Changes take effect immediately.",
+    notificationsLoaded: "Settings unlocked.",
+    notificationsSecretSaved: "Token saved — leave blank to keep it",
+    notificationsWorking: "Working…",
+    notificationsUnauthorized: "Invalid or revoked access token.",
+    notificationsNoChannels: "Enable and save at least one channel before testing.",
+    notificationsTestSuccess: "Sent successfully",
+    notificationsTestFailed: "Delivery failed",
+    notificationsAdminTitle: "Manage access tokens",
+    notificationsPassword: "Admin password",
+    notificationsLogin: "Log in",
+    notificationsLogout: "Log out",
+    notificationsSubscriberName: "Recipient name",
+    notificationsIssue: "Issue token",
+    notificationsRevoke: "Revoke",
+    notificationsRevokeConfirm: "Revoke this token and stop notifications for this recipient?",
+    notificationsTokenOnce: "This token is shown only once. Copy it and share it with the recipient.",
+    notificationsCopyToken: "Copy token",
+    notificationsCopied: "Token copied.",
+    notificationsAdminUnauthorized: "Invalid password or expired admin session.",
+    notificationsNoTokens: "No tokens issued yet.",
     tableScrollHint: "Swipe across the table for status and actions →",
     connectionError: "Connection lost",
     dropHelper: "XML or ZIP · Multiple files supported",
@@ -306,6 +372,9 @@ function applyLanguage(lang) {
   document.querySelectorAll('[data-i18n-aria]').forEach(el => {
     el.setAttribute('aria-label', t(el.dataset.i18nAria));
   });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
   [['btn-refresh', 'navBtnRefresh'], ['btn-loot-now', 'navBtnLoot'], ['btn-loot-table', 'btnLootNowTable'], ['btn-check-now', 'btnCheckAll']].forEach(([id, key]) => {
     const el = document.getElementById(id);
     el.title = t(key);
@@ -332,6 +401,7 @@ function applyLanguage(lang) {
   loadStatus();
   renderKeysTable();
   loadSources();
+  renderNotificationSubscribers();
 }
 
 // Toast Notification Utility
@@ -1391,6 +1461,226 @@ if (btnDownloadRepairedXml) {
     showToast(currentLang === "vi" ? "Đã tải xuống keybox.xml chuẩn hóa!" : "Downloaded standardized keybox.xml!", "success");
   });
 }
+
+const notificationForm = document.getElementById("notification-settings-form");
+const notificationAccessInput = document.getElementById("notification-access-token");
+const notificationStatus = document.getElementById("notification-status");
+let notificationAccessToken = "";
+
+function fillNotificationSettings(config) {
+  document.getElementById("notification-webhook-enabled").checked = config.webhook_enabled;
+  document.getElementById("notification-webhook-url").value = config.webhook_url;
+  document.getElementById("notification-telegram-enabled").checked = config.telegram_enabled;
+  document.getElementById("notification-chat-id").value = config.telegram_chat_id;
+  for (const [id, saved] of [["notification-webhook-token", config.webhook_token_set], ["notification-bot-token", config.telegram_bot_token_set]]) {
+    const input = document.getElementById(id);
+    input.value = "";
+    input.placeholder = saved ? t("notificationsSecretSaved") : "";
+    if (saved) input.dataset.i18nPlaceholder = "notificationsSecretSaved";
+    else delete input.dataset.i18nPlaceholder;
+  }
+}
+
+async function notificationRequest(method, path = "", body) {
+  const buttons = document.querySelectorAll("#notification-unlock-form button, #notification-settings-form button");
+  buttons.forEach(button => { button.disabled = true; });
+  notificationStatus.textContent = t("notificationsWorking");
+  try {
+    const response = await fetch(`/api/notifications${path}`, {
+      method,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${notificationAccessToken}` },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await response.json();
+    if (response.status === 401) {
+      notificationAccessToken = "";
+      notificationForm.classList.add("hidden");
+      throw new Error(t("notificationsUnauthorized"));
+    }
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  } finally {
+    buttons.forEach(button => { button.disabled = false; });
+  }
+}
+
+document.getElementById("notification-unlock-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  notificationAccessToken = notificationAccessInput.value.trim();
+  notificationAccessInput.value = "";
+  try {
+    fillNotificationSettings(await notificationRequest("GET"));
+    notificationForm.classList.remove("hidden");
+    notificationStatus.textContent = t("notificationsLoaded");
+  } catch (err) {
+    notificationStatus.textContent = err.message;
+  }
+});
+
+notificationForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  try {
+    const config = await notificationRequest("PUT", "", {
+      webhook_enabled: document.getElementById("notification-webhook-enabled").checked,
+      webhook_url: document.getElementById("notification-webhook-url").value,
+      webhook_token: document.getElementById("notification-webhook-token").value,
+      telegram_enabled: document.getElementById("notification-telegram-enabled").checked,
+      telegram_bot_token: document.getElementById("notification-bot-token").value,
+      telegram_chat_id: document.getElementById("notification-chat-id").value
+    });
+    fillNotificationSettings(config);
+    notificationStatus.textContent = t("notificationsSaved");
+  } catch (err) {
+    notificationStatus.textContent = err.message;
+  }
+});
+
+document.getElementById("notification-test").addEventListener("click", async () => {
+  try {
+    const data = await notificationRequest("POST", "/test");
+    notificationStatus.textContent = data.results.length ? data.results.map(result =>
+      `${result.channel}: ${t(result.success ? "notificationsTestSuccess" : "notificationsTestFailed")}${result.error ? ` (${result.error})` : ""}`
+    ).join(" · ") : t("notificationsNoChannels");
+  } catch (err) {
+    notificationStatus.textContent = err.message;
+  }
+});
+
+let notificationAdminSession = "";
+let notificationSubscribers = [];
+let notificationIssuedId = "";
+const notificationAdminPanel = document.getElementById("notification-admin-panel");
+const notificationAdminStatus = document.getElementById("notification-admin-status");
+
+function clearNotificationAdmin() {
+  notificationAdminSession = "";
+  notificationSubscribers = [];
+  notificationIssuedId = "";
+  document.getElementById("notification-issued-token").value = "";
+  document.getElementById("notification-issued").classList.add("hidden");
+  notificationAdminPanel.classList.add("hidden");
+  document.getElementById("notification-admin-login").classList.remove("hidden");
+}
+
+async function notificationAdminRequest(method, path, body) {
+  const response = await fetch(`/api/notifications/admin${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${notificationAdminSession}` },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await response.json();
+  if (response.status === 401) {
+    clearNotificationAdmin();
+    throw new Error(t("notificationsAdminUnauthorized"));
+  }
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  return data;
+}
+
+function renderNotificationSubscribers() {
+  const list = document.getElementById("notification-subscriber-list");
+  list.replaceChildren();
+  if (!notificationSubscribers.length) {
+    const item = document.createElement("li");
+    item.textContent = t("notificationsNoTokens");
+    list.appendChild(item);
+  }
+  for (const subscriber of notificationSubscribers) {
+    const item = document.createElement("li");
+    const name = document.createElement("span");
+    name.textContent = subscriber.name;
+    const revoke = document.createElement("button");
+    revoke.type = "button";
+    revoke.className = "btn btn-danger-outline btn-sm";
+    revoke.textContent = t("notificationsRevoke");
+    revoke.addEventListener("click", async () => {
+      if (!window.confirm(t("notificationsRevokeConfirm"))) return;
+      revoke.disabled = true;
+      try {
+        await notificationAdminRequest("DELETE", `/subscriptions/${subscriber.id}`);
+        if (notificationIssuedId === subscriber.id) {
+          document.getElementById("notification-issued-token").value = "";
+          document.getElementById("notification-issued").classList.add("hidden");
+        }
+        await loadNotificationSubscribers();
+      } catch (err) {
+        notificationAdminStatus.textContent = err.message;
+      } finally {
+        revoke.disabled = false;
+      }
+    });
+    item.append(name, revoke);
+    list.appendChild(item);
+  }
+}
+
+async function loadNotificationSubscribers() {
+  const data = await notificationAdminRequest("GET", "/subscriptions");
+  notificationSubscribers = data.subscriptions;
+  renderNotificationSubscribers();
+}
+
+document.getElementById("notification-admin-login").addEventListener("submit", async event => {
+  event.preventDefault();
+  const passwordInput = document.getElementById("notification-admin-password");
+  const password = passwordInput.value;
+  passwordInput.value = "";
+  const button = event.currentTarget.querySelector("button");
+  button.disabled = true;
+  notificationAdminStatus.textContent = t("notificationsWorking");
+  try {
+    const data = await notificationAdminRequest("POST", "/login", { password });
+    notificationAdminSession = data.token;
+    await loadNotificationSubscribers();
+    notificationAdminPanel.classList.remove("hidden");
+    document.getElementById("notification-admin-login").classList.add("hidden");
+    notificationAdminStatus.textContent = "";
+  } catch (err) {
+    notificationAdminStatus.textContent = err.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.getElementById("notification-issue-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const nameInput = document.getElementById("notification-subscriber-name");
+  const button = event.currentTarget.querySelector("button");
+  button.disabled = true;
+  try {
+    const data = await notificationAdminRequest("POST", "/subscriptions", { name: nameInput.value });
+    notificationIssuedId = data.id;
+    document.getElementById("notification-issued-token").value = data.token;
+    document.getElementById("notification-issued").classList.remove("hidden");
+    nameInput.value = "";
+    notificationAdminStatus.textContent = "";
+    await loadNotificationSubscribers();
+  } catch (err) {
+    notificationAdminStatus.textContent = err.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.getElementById("notification-copy-token").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(document.getElementById("notification-issued-token").value);
+    notificationAdminStatus.textContent = t("notificationsCopied");
+  } catch (err) {
+    notificationAdminStatus.textContent = err.message;
+  }
+});
+
+document.getElementById("notification-admin-logout").addEventListener("click", async () => {
+  try {
+    await notificationAdminRequest("POST", "/logout");
+    notificationAdminStatus.textContent = "";
+  } catch (err) {
+    notificationAdminStatus.textContent = err.message;
+  } finally {
+    clearNotificationAdmin();
+  }
+});
 
 // Initial load & Setup Language
 applyLanguage(currentLang);

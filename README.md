@@ -2,6 +2,55 @@
 
 ## Thông báo webhook và Telegram
 
+### Cấu hình trực tiếp trên web
+
+Mở mục **Thông báo** trên web. Mỗi người nhận dùng token do admin cấp để nhập
+webhook URL, webhook token (tùy chọn), Telegram bot token và chat ID của riêng mình.
+Bật các kênh cần dùng, bấm **Lưu cấu hình**, rồi **Gửi thử cấu hình đã lưu**.
+Để trống ô token để giữ token đã lưu. Các thay đổi có hiệu lực ngay.
+
+Trong **Quản trị token**, admin đăng nhập bằng mật khẩu, nhập tên người nhận và
+bấm **Cấp token**. Token chỉ hiển thị lúc cấp: sao chép và gửi cho người nhận.
+**Thu hồi** sẽ xóa cấu hình người nhận, vô hiệu token và dừng các lần gửi tiếp theo.
+Người dùng chỉ xem và sửa cấu hình gắn với token của mình.
+
+Cấu hình được lưu tại `data/notification-settings.json` với quyền đọc/ghi chỉ cho
+chủ file và được bỏ qua trong Git. Mật khẩu quản trị được hash bằng scrypt; token
+truy cập được lưu dạng hash. API không trả lại bot token hoặc webhook token đã lưu.
+Phiên quản trị hết hạn sau 8 giờ hoặc khi server khởi động lại; token người nhận
+và cấu hình vẫn được giữ qua lần khởi động lại. Đăng nhập sai 5 lần trong một phút
+sẽ bị giới hạn tạm thời.
+
+Để khởi tạo mật khẩu quản trị trên một server mới, đặt `KEYBOX_ADMIN_PASSWORD`
+trong môi trường khi chạy lần đầu. Để đổi mật khẩu trên server hiện tại:
+
+```bash
+read -rsp 'Admin password: ' notification_password
+printf '\n'
+KEYBOX_ADMIN_PASSWORD="$notification_password" node --input-type=module -e '
+  const settings = await import("./src/notification-settings.js");
+  settings.initNotificationSettings();
+  settings.setNotificationAdminPassword(process.env.KEYBOX_ADMIN_PASSWORD);
+'
+unset notification_password
+sudo systemctl restart keybox.service
+```
+
+Các API dùng `Authorization: Bearer <token>`:
+
+| API | Quyền | Công dụng |
+| --- | --- | --- |
+| `POST /api/notifications/admin/login` | Mật khẩu | Đăng nhập với JSON `{ "password": "..." }` |
+| `GET /api/notifications/admin/subscriptions` | Admin | Danh sách người nhận |
+| `POST /api/notifications/admin/subscriptions` | Admin | Cấp token với JSON `{ "name": "..." }` |
+| `DELETE /api/notifications/admin/subscriptions/:id` | Admin | Thu hồi token |
+| `POST /api/notifications/admin/logout` | Admin | Đăng xuất |
+| `GET /api/notifications` | Người nhận | Đọc cấu hình, che token |
+| `PUT /api/notifications` | Người nhận | Lưu cấu hình của mình |
+| `POST /api/notifications/test` | Người nhận | Gửi thử đến các kênh đã lưu của mình |
+
+### Sự kiện và cấu hình bằng môi trường
+
 Thông báo được gửi khi upload hoặc tự lấy key mới từ nguồn ngoài, khi key vừa
 chuyển sang banned, và khi trạng thái Strong/Device/softban thay đổi hoặc phục hồi.
 Key trùng bị bỏ qua và kiểm tra lại không có thay đổi sẽ không gửi thông báo.
@@ -79,5 +128,5 @@ thông báo có thể mất khi dịch vụ nhận lỗi hoặc tiến trình d�
 Chạy test thông báo độc lập, không dùng database đang hoạt động:
 
 ```bash
-node --test test/notifications.test.js
+node --test test/notifications.test.js test/notification-settings.test.js
 ```

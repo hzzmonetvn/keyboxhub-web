@@ -24,6 +24,8 @@ import { analyzeKeybox, decodeKeyboxBytes, parseKeyboxXml } from "./analyzer.js"
 import { repairKeybox } from "./repairer.js";
 import { startPeriodicCheck, runFullHourlyCycle } from "./cron.js";
 import { fetchAndLootThirdPartySources, normaliseKeyboxBody } from "./source-fetcher.js";
+import { initNotificationSettings } from "./notification-settings.js";
+import { notificationRoutes } from "./notification-routes.js";
 
 const PORT = process.env.PORT || 8098;
 const app = express();
@@ -39,6 +41,7 @@ app.use(cors());
 app.use(express.json({ limit: "20mb" }));
 app.use(express.text({ type: ["text/xml", "application/xml", "text/plain"], limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+app.use("/api/notifications", notificationRoutes(getSystemStatus));
 
 // Serve static UI assets with no-cache headers to prevent browser caching stale JS/HTML
 app.use(express.static(join(process.cwd(), "public"), {
@@ -596,6 +599,7 @@ app.post("/api/sources/:id/toggle", (req, res) => {
 // ==========================================
 async function main() {
   initDb();
+  initNotificationSettings();
   await trustManager.init();
   startPeriodicCheck();
 

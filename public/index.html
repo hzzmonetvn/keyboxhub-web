@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=5.0" />
+    <link rel="stylesheet" href="style.css?v=5.2" />
   </head>
   <body>
     <a class="skip-link" href="#overview" data-i18n="skipContent"
@@ -53,6 +53,7 @@
           <a href="#repository" data-i18n="navRepository">Kho keybox</a>
           <a href="#repair" data-i18n="navRepair">Sửa lỗi keybox</a>
           <a href="#sources" data-i18n="navSources">Nguồn</a>
+          <a href="#notifications" data-i18n="notificationsNav">Thông báo</a>
           <a href="#api-docs">API</a>
         </nav>
         <div class="nav-actions">
@@ -959,6 +960,70 @@
         </div>
       </section>
 
+      <section class="card" id="notifications">
+        <div class="card-header">
+          <div>
+            <h3 data-i18n="notificationsTitle">Webhook & Telegram</h3>
+            <p data-i18n="notificationsDesc">Nhận tin khi có key mới, key bị ban hoặc đổi trạng thái.</p>
+          </div>
+        </div>
+        <form id="notification-unlock-form" class="notification-unlock">
+          <label for="notification-access-token" data-i18n="notificationsAdmin">Token truy cập</label>
+          <input id="notification-access-token" class="input-styled" type="password" autocomplete="off" required aria-describedby="notification-admin-help" />
+          <button class="btn btn-secondary" type="submit" data-i18n="notificationsUnlock">Mở cấu hình</button>
+          <p id="notification-admin-help" data-i18n="notificationsAdminHelp">Nhập token do admin cấp để lưu webhook hoặc Telegram của riêng bạn.</p>
+        </form>
+        <form id="notification-settings-form" class="hidden">
+          <div class="notification-grid">
+            <fieldset>
+              <legend>Webhook</legend>
+              <label class="notification-toggle"><input id="notification-webhook-enabled" type="checkbox" /><span data-i18n="notificationsWebhookEnable">Bật webhook</span></label>
+              <label for="notification-webhook-url">Webhook URL</label>
+              <input id="notification-webhook-url" class="input-styled" type="url" maxlength="2048" placeholder="https://example.com/keybox-events" />
+              <label for="notification-webhook-token" data-i18n="notificationsWebhookToken">Webhook token (tùy chọn)</label>
+              <input id="notification-webhook-token" class="input-styled" type="password" autocomplete="new-password" maxlength="2048" />
+            </fieldset>
+            <fieldset>
+              <legend>Telegram</legend>
+              <label class="notification-toggle"><input id="notification-telegram-enabled" type="checkbox" /><span data-i18n="notificationsTelegramEnable">Bật Telegram</span></label>
+              <label for="notification-bot-token">Bot token</label>
+              <input id="notification-bot-token" class="input-styled" type="password" autocomplete="new-password" maxlength="2048" />
+              <label for="notification-chat-id">Chat ID</label>
+              <input id="notification-chat-id" class="input-styled" type="text" maxlength="2048" placeholder="-1001234567890" />
+            </fieldset>
+          </div>
+          <p class="notification-help" data-i18n="notificationsHelp">Để trống token để giữ token đã lưu. Tạo bot bằng @BotFather, nhắn /start hoặc thêm bot vào nhóm/kênh và cấp quyền gửi tin.</p>
+          <div class="notification-actions">
+            <button id="notification-save" class="btn btn-primary" type="submit" data-i18n="notificationsSave">Lưu cấu hình</button>
+            <button id="notification-test" class="btn btn-secondary" type="button" data-i18n="notificationsTest">Gửi thử cấu hình đã lưu</button>
+          </div>
+        </form>
+        <p id="notification-status" class="notification-help" role="status" aria-live="polite"></p>
+        <details class="notification-admin">
+          <summary data-i18n="notificationsAdminTitle">Quản trị token</summary>
+          <form id="notification-admin-login" class="notification-unlock">
+            <label for="notification-admin-password" data-i18n="notificationsPassword">Mật khẩu quản trị</label>
+            <input id="notification-admin-password" class="input-styled" type="password" autocomplete="current-password" required />
+            <button class="btn btn-secondary" type="submit" data-i18n="notificationsLogin">Đăng nhập</button>
+          </form>
+          <div id="notification-admin-panel" class="hidden">
+            <form id="notification-issue-form" class="notification-unlock">
+              <label for="notification-subscriber-name" data-i18n="notificationsSubscriberName">Tên người nhận</label>
+              <input id="notification-subscriber-name" class="input-styled" type="text" maxlength="100" required />
+              <button class="btn btn-primary" type="submit" data-i18n="notificationsIssue">Cấp token</button>
+            </form>
+            <div id="notification-issued" class="hidden">
+              <label for="notification-issued-token" class="notification-help" data-i18n="notificationsTokenOnce">Token chỉ hiển thị một lần. Sao chép và gửi cho người nhận.</label>
+              <input id="notification-issued-token" class="input-styled" type="text" readonly />
+              <button id="notification-copy-token" class="btn btn-secondary btn-sm" type="button" data-i18n="notificationsCopyToken">Sao chép token</button>
+            </div>
+            <ul id="notification-subscriber-list" class="notification-subscribers"></ul>
+            <button id="notification-admin-logout" class="btn btn-secondary btn-sm" type="button" data-i18n="notificationsLogout">Đăng xuất</button>
+          </div>
+          <p id="notification-admin-status" class="notification-help" role="status" aria-live="polite"></p>
+        </details>
+      </section>
+
       <!-- API Reference Documentation Card -->
       <section class="card api-docs-card" id="api-docs">
         <div class="card-header">
@@ -1083,6 +1148,6 @@ curl -X POST -H "Content-Type: application/xml" --data-binary @broken.xml https:
       </div>
     </footer>
 
-    <script src="app.js?v=5.1"></script>
+    <script src="app.js?v=5.2"></script>
   </body>
 </html>
