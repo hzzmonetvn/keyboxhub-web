@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {
   loginNotificationAdmin, authorizeNotificationAdmin, logoutNotificationAdmin, getNotificationSubscriber,
-  publicNotificationSettings, saveNotificationSettings, listNotificationSubscribers,
+  publicNotificationSettings, saveNotificationSettings, validateNotificationSettings, listNotificationSubscribers,
   createNotificationSubscriber, deleteNotificationSubscriber
 } from "./notification-settings.js";
 import { sendKeyboxNotification } from "./notifications.js";
@@ -62,7 +62,15 @@ export function notificationRoutes(getSystemStatus) {
     }
   });
   router.post("/test", async (req, res) => {
-    const results = await sendKeyboxNotification(req.notificationSubscriber, "keybox.test", {
+    let config = req.notificationSubscriber;
+    if (req.body && Object.keys(req.body).length > 0) {
+      try {
+        config = validateNotificationSettings(config, req.body);
+      } catch (err) {
+        return res.status(400).json({ error: err.message });
+      }
+    }
+    const results = await sendKeyboxNotification(config, "keybox.test", {
       id: 0, device_id: "Test notification", algorithm: "test", status: "test",
       is_softbanned: 0, source: "Keybox Hub", uploaded_at: new Date().toISOString(), banned_at: null
     }, null, getSystemStatus());

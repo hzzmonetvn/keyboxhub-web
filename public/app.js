@@ -16,17 +16,17 @@ const translations = {
     notificationsWebhookEnable: "Bật webhook",
     notificationsTelegramEnable: "Bật Telegram",
     notificationsWebhookToken: "Webhook token (tùy chọn)",
-    notificationsHelp: "Để trống token để giữ token đã lưu. Tạo bot bằng @BotFather, nhắn /start hoặc thêm bot vào nhóm/kênh và cấp quyền gửi tin.",
+    notificationsHelp: "Để trống token để giữ token đã lưu. Test connection gửi tin thử theo các giá trị đang nhập, không lưu thay đổi. Tạo bot bằng @BotFather, nhắn /start hoặc thêm bot vào nhóm/kênh và cấp quyền gửi tin.",
     notificationsSave: "Lưu cấu hình",
-    notificationsTest: "Gửi thử cấu hình đã lưu",
+    notificationsTest: "Test connection",
     notificationsSaved: "Đã lưu cấu hình. Thay đổi có hiệu lực ngay.",
     notificationsLoaded: "Đã mở cấu hình.",
     notificationsSecretSaved: "Đã lưu token — để trống để giữ nguyên",
     notificationsWorking: "Đang xử lý…",
     notificationsUnauthorized: "Token không đúng hoặc đã bị thu hồi.",
-    notificationsNoChannels: "Hãy bật và lưu ít nhất một kênh trước khi gửi thử.",
-    notificationsTestSuccess: "Gửi thành công",
-    notificationsTestFailed: "Gửi thất bại",
+    notificationsNoChannels: "Hãy bật ít nhất một kênh trước khi kiểm tra kết nối.",
+    notificationsTestSuccess: "Kết nối thành công",
+    notificationsTestFailed: "Kết nối thất bại",
     notificationsAdminTitle: "Quản trị token",
     notificationsPassword: "Mật khẩu quản trị",
     notificationsLogin: "Đăng nhập",
@@ -184,17 +184,17 @@ const translations = {
     notificationsWebhookEnable: "Enable webhook",
     notificationsTelegramEnable: "Enable Telegram",
     notificationsWebhookToken: "Webhook token (optional)",
-    notificationsHelp: "Leave tokens blank to keep saved tokens. Create a bot with @BotFather, send /start or add it to your group/channel and allow it to send messages.",
+    notificationsHelp: "Leave tokens blank to keep saved tokens. Test connection sends a test message using the current inputs without saving changes. Create a bot with @BotFather, send /start or add it to your group/channel and allow it to send messages.",
     notificationsSave: "Save settings",
-    notificationsTest: "Test saved settings",
+    notificationsTest: "Test connection",
     notificationsSaved: "Settings saved. Changes take effect immediately.",
     notificationsLoaded: "Settings unlocked.",
     notificationsSecretSaved: "Token saved — leave blank to keep it",
     notificationsWorking: "Working…",
     notificationsUnauthorized: "Invalid or revoked access token.",
-    notificationsNoChannels: "Enable and save at least one channel before testing.",
-    notificationsTestSuccess: "Sent successfully",
-    notificationsTestFailed: "Delivery failed",
+    notificationsNoChannels: "Enable at least one channel before testing the connection.",
+    notificationsTestSuccess: "Connection successful",
+    notificationsTestFailed: "Connection failed",
     notificationsAdminTitle: "Manage access tokens",
     notificationsPassword: "Admin password",
     notificationsLogin: "Log in",
@@ -1517,17 +1517,21 @@ document.getElementById("notification-unlock-form").addEventListener("submit", a
   }
 });
 
+function readNotificationSettings() {
+  return {
+    webhook_enabled: document.getElementById("notification-webhook-enabled").checked,
+    webhook_url: document.getElementById("notification-webhook-url").value,
+    webhook_token: document.getElementById("notification-webhook-token").value,
+    telegram_enabled: document.getElementById("notification-telegram-enabled").checked,
+    telegram_bot_token: document.getElementById("notification-bot-token").value,
+    telegram_chat_id: document.getElementById("notification-chat-id").value
+  };
+}
+
 notificationForm.addEventListener("submit", async event => {
   event.preventDefault();
   try {
-    const config = await notificationRequest("PUT", "", {
-      webhook_enabled: document.getElementById("notification-webhook-enabled").checked,
-      webhook_url: document.getElementById("notification-webhook-url").value,
-      webhook_token: document.getElementById("notification-webhook-token").value,
-      telegram_enabled: document.getElementById("notification-telegram-enabled").checked,
-      telegram_bot_token: document.getElementById("notification-bot-token").value,
-      telegram_chat_id: document.getElementById("notification-chat-id").value
-    });
+    const config = await notificationRequest("PUT", "", readNotificationSettings());
     fillNotificationSettings(config);
     notificationStatus.textContent = t("notificationsSaved");
   } catch (err) {
@@ -1537,7 +1541,8 @@ notificationForm.addEventListener("submit", async event => {
 
 document.getElementById("notification-test").addEventListener("click", async () => {
   try {
-    const data = await notificationRequest("POST", "/test");
+    if (!notificationForm.reportValidity()) return;
+    const data = await notificationRequest("POST", "/test", readNotificationSettings());
     notificationStatus.textContent = data.results.length ? data.results.map(result =>
       `${result.channel}: ${t(result.success ? "notificationsTestSuccess" : "notificationsTestFailed")}${result.error ? ` (${result.error})` : ""}`
     ).join(" · ") : t("notificationsNoChannels");

@@ -6,7 +6,8 @@
 
 Mở mục **Thông báo** trên web. Mỗi người nhận dùng token do admin cấp để nhập
 webhook URL, webhook token (tùy chọn), Telegram bot token và chat ID của riêng mình.
-Bật các kênh cần dùng, bấm **Lưu cấu hình**, rồi **Gửi thử cấu hình đã lưu**.
+Bật các kênh cần dùng, bấm **Test connection** để gửi tin thử theo các giá trị
+đang nhập, sau đó **Lưu cấu hình**. Kiểm tra kết nối không tự lưu thay đổi.
 Để trống ô token để giữ token đã lưu. Các thay đổi có hiệu lực ngay.
 
 Trong **Quản trị token**, admin đăng nhập bằng mật khẩu, nhập tên người nhận và
@@ -47,7 +48,7 @@ Các API dùng `Authorization: Bearer <token>`:
 | `POST /api/notifications/admin/logout` | Admin | Đăng xuất |
 | `GET /api/notifications` | Người nhận | Đọc cấu hình, che token |
 | `PUT /api/notifications` | Người nhận | Lưu cấu hình của mình |
-| `POST /api/notifications/test` | Người nhận | Gửi thử đến các kênh đã lưu của mình |
+| `POST /api/notifications/test` | Người nhận | Gửi thử cấu hình trong JSON; bỏ qua JSON để dùng cấu hình đã lưu |
 
 ### Sự kiện và cấu hình bằng môi trường
 

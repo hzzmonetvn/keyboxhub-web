@@ -215,6 +215,28 @@ test("disabled channels send no test or real notification", async () => {
   assert.equal(received.length, 0);
 });
 
+test("connection test uses unsaved input without changing stored settings", async () => {
+  const subscriber = await issue(await login());
+  await request("PUT", "", subscriber.token, config("saved"));
+  const result = await request("POST", "/test", subscriber.token, config("draft", { webhook_token: "draft-secret" }));
+  assert.equal(result.data.success, true);
+  assert.deepEqual(received.map(item => item.name), ["draft"]);
+  assert.equal(received[0].authorization, "Bearer draft-secret");
+  const saved = await request("GET", "", subscriber.token);
+  assert.equal(saved.data.webhook_url, `${baseUrl}/receiver/saved`);
+  assert.equal(getNotificationSubscriber(subscriber.token).webhook_token, "secret-webhook");
+  await request("POST", "/test", subscriber.token, config("draft", { webhook_token: "" }));
+  assert.equal(received[1].authorization, "Bearer secret-webhook");
+});
+
+test("connection test rejects invalid drafts and cannot bypass token authentication", async () => {
+  const subscriber = await issue(await login());
+  assert.equal((await request("POST", "/test", subscriber.token, config("invalid", { webhook_url: "file:///tmp/file" }))).status, 400);
+  assert.equal((await request("POST", "/test", "invalid-token", config("blocked"))).status, 401);
+  assert.equal(received.length, 0);
+  assert.equal((await request("GET", "", subscriber.token)).data.webhook_enabled, false);
+});
+
 test("admin login rate limits repeated wrong passwords", async () => {
   for (let i = 0; i < 5; i++) {
     assert.equal((await request("POST", "/admin/login", "", { password: "wrong" })).status, 401);

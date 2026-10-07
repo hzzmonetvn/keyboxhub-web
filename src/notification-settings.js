@@ -92,7 +92,7 @@ export function deleteNotificationSubscriber(id) {
   return true;
 }
 
-export function saveNotificationSettings(subscriber, input) {
+export function validateNotificationSettings(subscriber, input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Invalid settings");
   const next = { ...subscriber };
   for (const name of ["webhook_enabled", "telegram_enabled"]) {
@@ -115,6 +115,11 @@ export function saveNotificationSettings(subscriber, input) {
   if (next.telegram_enabled && (!next.telegram_bot_token || !next.telegram_chat_id)) throw new Error("Telegram bot token and chat ID are required");
   if (next.telegram_chat_id && !/^(?:-?\d+|@[A-Za-z0-9_]+)$/.test(next.telegram_chat_id)) throw new Error("Invalid Telegram chat ID");
   if (/[\r\n]/.test(next.webhook_token)) throw new Error("Invalid webhook token");
+  return next;
+}
+
+export function saveNotificationSettings(subscriber, input) {
+  const next = validateNotificationSettings(subscriber, input);
   persist({ ...store, subscribers: store.subscribers.map(item => item.id === next.id ? next : item) });
   return publicNotificationSettings(next);
 }
