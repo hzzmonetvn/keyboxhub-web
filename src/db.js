@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { analyzeKeybox } from "./analyzer.js";
+import { notifyKeyboxEvent } from "./notifications.js";
 
 const DB_PATH = join(process.cwd(), "data", "keybox.db");
 let db = null;
@@ -287,6 +288,7 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
   );
 
   touchLastUpdated();
+  void notifyKeyboxEvent("keybox.added", getKeyboxById(info.lastInsertRowid), null, getSystemStatus());
   return {
     id: info.lastInsertRowid,
     skipped: false,
@@ -443,6 +445,9 @@ export function reportKeybox(keyId, reporterIp = "") {
 
   db.prepare("UPDATE keyboxes SET report_device_count = ?, status = ? WHERE id = ?").run(newCount, newStatus, keyId);
   touchLastUpdated();
+  if (newStatus !== key.status) {
+    void notifyKeyboxEvent("keybox.status_changed", getKeyboxById(keyId), key.status, getSystemStatus());
+  }
 
   return {
     success: true,
@@ -589,6 +594,12 @@ export async function recheckAllKeysInDb(trustData) {
       );
 
       updatedCount++;
+      if (newStatus !== k.status || (isSoftbanned ? 1 : 0) !== k.is_softbanned) {
+        touchLastUpdated();
+        const event = newStatus === "banned" && k.status !== "banned"
+          ? "keybox.banned" : "keybox.status_changed";
+        void notifyKeyboxEvent(event, getKeyboxById(k.id), k.status, getSystemStatus());
+      }
     } catch (err) {
       console.error(`[DB] Error re-checking keybox #${k.id}:`, err.message);
     }
