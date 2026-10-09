@@ -195,6 +195,21 @@ export function computeKeyboxHash(analysis) {
  * Adds a new keybox, but SKIPS if duplicate by leaf serial, certificate hash, or DeviceID
  */
 export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "user_upload") {
+  const isOverallPass = analysis.overall === "pass" || analysis.overall === "warn";
+  if (!isOverallPass) {
+    const isRevoked = analysis.isSpecterRevoked || analysis.keyboxes.some(kb => kb.keys.some(key => key.revocation?.hits?.length));
+    return {
+      id: null,
+      skipped: false,
+      isNew: false,
+      isBanned: true,
+      status: isRevoked ? "banned" : "invalid",
+      deviceId: analysis.keyboxes.map(k => k.deviceId).filter(Boolean).join(", ") || "Unknown Device",
+      algorithm: Array.from(new Set(analysis.keyboxes.flatMap(k => k.keys.map(key => key.algorithm)))).join(", ") || "Unknown",
+      reason: analysis.errors.join("; ") || "Keybox không hợp lệ. Hệ thống từ chối lưu trữ."
+    };
+  }
+
   const keyHash = computeKeyboxHash(analysis);
   if (!keyHash) {
     throw new Error("Could not extract certificates or keys to create unique keybox hash");
@@ -255,15 +270,11 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
     }
   }
 
-  const isOverallPass = analysis.overall === "pass" || analysis.overall === "warn";
   const isSoftbanned = !!analysis.isSoftbanned;
 
   // Softbanned keys can only achieve Device status, never Strong!
-  let initialStatus = isOverallPass ? "strong" : "banned";
-  if (initialStatus === "strong" && isSoftbanned) {
-    initialStatus = "device";
-  }
-  const bannedAt = initialStatus === "banned" ? now : null;
+  let initialStatus = isSoftbanned ? "device" : "strong";
+  const bannedAt = null;
 
   const insert = db.prepare(`
     INSERT INTO keyboxes (
@@ -519,21 +530,15 @@ export function toggleSource(id, enabled) {
 }
 
 /**
- * Automatically delete banned/revoked keys older than 24 hours
+ * Automatically delete all banned/revoked keys immediately
  */
 export function cleanupOldBannedKeys() {
-  const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const info = db.prepare(`
-    DELETE FROM keyboxes 
-    WHERE status = 'banned' 
-      AND banned_at IS NOT NULL 
-      AND banned_at <= ?
-  `).run(cutoffTime);
+  const info = db.prepare("DELETE FROM keyboxes WHERE status = 'banned'").run();
 
   if (info.changes > 0) {
     db.prepare("DELETE FROM reports WHERE key_id NOT IN (SELECT id FROM keyboxes)").run();
     touchLastUpdated();
-    console.log(`[DB Cleanup] Removed ${info.changes} revoked keyboxes older than 24 hours.`);
+    console.log(`[DB Cleanup] Removed ${info.changes} revoked keyboxes.`);
   }
 
   return info.changes;
@@ -556,28 +561,31 @@ export async function recheckAllKeysInDb(trustData) {
       const { serials } = extractLeafSerials(analysis);
       const keyHash = computeKeyboxHash(analysis);
 
-      let newStatus = k.status;
-      let newBannedAt = k.banned_at;
-
       if (!isOverallPass) {
-        newStatus = "banned";
-        if (!newBannedAt) newBannedAt = nowIso;
         bannedCount++;
-      } else if (isSoftbanned) {
-        newStatus = "device";
-        newBannedAt = null;
+        db.transaction(() => {
+          db.prepare("DELETE FROM reports WHERE key_id = ?").run(k.id);
+          db.prepare("DELETE FROM keyboxes WHERE id = ?").run(k.id);
+          touchLastUpdated();
+        })();
+        const bannedKeySnapshot = { ...k, status: "banned", banned_at: nowIso };
+        void notifyKeyboxEvent("keybox.banned", bannedKeySnapshot, k.status, getSystemStatus());
+        continue;
+      }
+
+      let newStatus = isSoftbanned
+        ? "device"
+        : (k.report_device_count > 5 ? "device" : "strong");
+      if (isSoftbanned) {
         softbannedCount++;
-      } else {
-        newStatus = k.report_device_count > 5 ? "device" : "strong";
-        newBannedAt = null;
       }
 
       db.prepare(`
-        UPDATE keyboxes 
-        SET check_result = ?, 
+        UPDATE keyboxes
+        SET check_result = ?,
             last_checked_at = ?,
             status = ?,
-            banned_at = ?,
+            banned_at = NULL,
             serials = ?,
             is_softbanned = ?,
             key_hash = COALESCE(?, key_hash)
@@ -586,7 +594,6 @@ export async function recheckAllKeysInDb(trustData) {
         JSON.stringify(analysis),
         nowIso,
         newStatus,
-        newBannedAt,
         JSON.stringify(serials),
         isSoftbanned ? 1 : 0,
         keyHash,
@@ -596,9 +603,7 @@ export async function recheckAllKeysInDb(trustData) {
       updatedCount++;
       if (newStatus !== k.status || (isSoftbanned ? 1 : 0) !== k.is_softbanned) {
         touchLastUpdated();
-        const event = newStatus === "banned" && k.status !== "banned"
-          ? "keybox.banned" : "keybox.status_changed";
-        void notifyKeyboxEvent(event, getKeyboxById(k.id), k.status, getSystemStatus());
+        void notifyKeyboxEvent("keybox.status_changed", getKeyboxById(k.id), k.status, getSystemStatus());
       }
     } catch (err) {
       console.error(`[DB] Error re-checking keybox #${k.id}:`, err.message);
@@ -608,6 +613,6 @@ export async function recheckAllKeysInDb(trustData) {
   const cleanedCount = cleanupOldBannedKeys();
 
   touchLastUpdated();
-  console.log(`[DB] Recheck finished: ${updatedCount} keys evaluated (${softbannedCount} softbanned), ${bannedCount} marked banned, ${cleanedCount} purged (>24h).`);
+  console.log(`[DB] Recheck finished: ${updatedCount} keys evaluated (${softbannedCount} softbanned), ${bannedCount} revoked and deleted immediately.`);
   return { updatedCount, bannedCount, softbannedCount, cleanedCount };
 }

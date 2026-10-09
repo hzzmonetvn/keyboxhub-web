@@ -75,6 +75,7 @@ class TrustManager {
 
   checkSpecterStatus(serials) {
     const list = Array.isArray(serials) ? serials : [serials];
+    let match = null;
     for (const s of list) {
       if (!s) continue;
       const raw = String(s).trim().toLowerCase();
@@ -86,17 +87,19 @@ class TrustManager {
         const entryNorm = normalizeSerial(entryRaw);
 
         if (entryRaw === raw || entryNorm === norm || entryRaw === norm || entryNorm === raw) {
-          return {
+          const candidate = {
             matched: true,
             isSoftbanned: entry.softbanned === true,
             isRevoked: entry.revoked === true,
             entry,
           };
+          if (candidate.isRevoked) return candidate;
+          if (!match || candidate.isSoftbanned) match = candidate;
         }
       }
     }
 
-    return {
+    return match || {
       matched: false,
       isSoftbanned: false,
       isRevoked: false,
@@ -127,6 +130,9 @@ class TrustManager {
         throw new Error(`Status URL responded with HTTP ${statusRes.status}`);
       }
       const status = await statusRes.json();
+      if (!status?.entries || typeof status.entries !== "object" || Array.isArray(status.entries)) {
+        throw new Error("Invalid Google revocation response");
+      }
 
       // 2. Fetch Google Attestation Roots
       const rootRes = await fetch(`${ROOT_URL}?ts=${now}`, {
@@ -144,7 +150,7 @@ class TrustManager {
         const text = await rootRes.text();
         try {
           const json = JSON.parse(text);
-          const values = json.certificates || json.roots || json.entries || (Array.isArray(json) ? json : []);
+          const values = Array.isArray(json) ? json : (json.certificates || json.roots || json.entries || []);
           if (Array.isArray(values)) {
             fetchedRoots = values.map(v => typeof v === "string" ? v : v.pem || v.certificate).filter(Boolean);
           }
@@ -153,6 +159,9 @@ class TrustManager {
         }
       }
 
+      if (!rootRes.ok || fetchedRoots.length === 0) {
+        throw new Error("Google attestation roots unavailable");
+      }
       let roots = (this.trustData.roots || DEFAULT_TRUST_DATA.roots).filter(root => !root.id.startsWith("google_fetched_"));
       fetchedRoots.forEach((pem, index) => {
         roots.push({
@@ -207,7 +216,7 @@ class TrustManager {
       return this.getTrustData();
     } catch (err) {
       console.error("[TrustManager] Failed to refresh trust data:", err.message);
-      return this.getTrustData();
+      throw err;
     }
   }
 }

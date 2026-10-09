@@ -1,178 +1,129 @@
 import assert from "node:assert/strict";
+import { after, before, beforeEach, test } from "node:test";
+import { makeKeybox, trustFor, revoke } from "../test-support/fixtures.js";
+import { startServer, postJson, postText } from "../test-support/server.js";
 
-function concatBytes(...parts) {
-  const len = parts.reduce((n, p) => n + p.length, 0);
-  const out = new Uint8Array(len);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
+const rsa = makeKeybox({ alg: "rsa", serial: 4001, deviceId: "api-rsa" });
+const ec = makeKeybox({ alg: "ec", serial: 4002, deviceId: "api-ec" });
+const trust = trustFor(rsa.certPem, ec.certPem);
+let s;
+
+before(async () => { s = await startServer(trust); });
+after(() => s.close());
+beforeEach(() => {
+  s.state.trust = trust;
+  s.db.prepare("DELETE FROM reports").run();
+  s.db.prepare("DELETE FROM keyboxes").run();
+});
+
+const count = () => s.db.prepare("SELECT COUNT(*) c FROM keyboxes").get().c;
+
+test("raw JSON upload of RSA and EC keyboxes is accepted as strong", async () => {
+  for (const k of [rsa, ec]) {
+    const res = await postJson(s.base, "/api/upload", { xml: k.xml });
+    const data = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(data.success, true);
+    assert.equal(data.status, "strong");
   }
-  return out;
-}
+  assert.equal(count(), 2);
+});
 
-function derLen(len) {
-  if (len < 128) return Uint8Array.of(len);
-  const bytes = [];
-  while (len) {
-    bytes.unshift(len & 0xff);
-    len >>= 8;
+test("raw text upload accepted", async () => {
+  const res = await postText(s.base, "/api/upload", rsa.xml);
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).status, "strong");
+});
+
+test("status, download, update, report threshold", async () => {
+  const { id } = await (await postJson(s.base, "/api/upload", { xml: rsa.xml })).json();
+  const status = await (await fetch(s.base + "/api/status")).json();
+  assert.equal(status.status, "strong");
+  assert.equal(status.strong_count, 1);
+
+  const dl = await fetch(s.base + "/api/download");
+  assert.equal(dl.status, 200);
+  assert.ok((await dl.text()).includes("api-rsa"));
+
+  const upd = await (await fetch(s.base + "/api/update")).json();
+  assert.equal(upd.status, "strong");
+  assert.ok(upd.last_updated);
+
+  for (let i = 0; i < 6; i++) await postJson(s.base, "/api/report", { id });
+  const after = await (await fetch(s.base + "/api/status")).json();
+  assert.equal(after.status, "device");
+  assert.equal(after.device_count, 1);
+  assert.equal(after.strong_count, 0);
+});
+
+test("download prioritises strong over device", async () => {
+  const a = await (await postJson(s.base, "/api/upload", { xml: rsa.xml })).json();
+  await postJson(s.base, "/api/upload", { xml: ec.xml });
+  s.db.prepare("UPDATE keyboxes SET status='device' WHERE id=?").run(a.id);
+  for (let i = 0; i < 10; i++) {
+    const dl = await (await fetch(s.base + "/api/download?format=json")).json();
+    assert.equal(dl.status, "strong");
   }
-  return Uint8Array.of(0x80 | bytes.length, ...bytes);
-}
+});
 
-function derWrap(tag, value) {
-  return concatBytes(Uint8Array.of(tag), derLen(value.length), value);
-}
+test("untrusted self-signed key is rejected with 422 and nothing stored", async () => {
+  const stranger = makeKeybox({ serial: 4003 });
+  const res = await postJson(s.base, "/api/upload", { xml: stranger.xml });
+  assert.equal(res.status, 422);
+  assert.equal((await res.json()).success, false);
+  assert.equal(count(), 0);
+  assert.equal(s.db.prepare("SELECT COUNT(*) c FROM reports").get().c, 0);
+});
 
-function derSeq(...parts) { return derWrap(0x30, concatBytes(...parts)); }
-function derSet(...parts) { return derWrap(0x31, concatBytes(...parts)); }
-function derNull() { return Uint8Array.of(0x05, 0x00); }
-function derUtf8(value) { return derWrap(0x0c, new TextEncoder().encode(value)); }
-function derBitString(value) { return derWrap(0x03, concatBytes(Uint8Array.of(0), value)); }
-function derContext(tag, value) { return derWrap(0xa0 + tag, value); }
-function derUtc(value) { return derWrap(0x17, new TextEncoder().encode(value)); }
-
-function derInt(bytes) {
-  let value = bytes instanceof Uint8Array ? bytes : Uint8Array.of(bytes);
-  while (value.length > 1 && value[0] === 0) value = value.subarray(1);
-  if (value[0] & 0x80) value = concatBytes(Uint8Array.of(0), value);
-  return derWrap(0x02, value);
-}
-
-function derOid(dotted) {
-  const nums = dotted.split(".").map(BigInt);
-  const out = [Number(nums[0] * 40n + nums[1])];
-  for (let n of nums.slice(2)) {
-    const stack = [Number(n & 0x7fn)];
-    n >>= 7n;
-    while (n) {
-      stack.unshift(Number((n & 0x7fn) | 0x80n));
-      n >>= 7n;
-    }
-    out.push(...stack);
-  }
-  return derWrap(0x06, Uint8Array.from(out));
-}
-
-function pem(label, bytes) {
-  const b64 = Buffer.from(bytes).toString("base64").replace(/(.{64})/g, "$1\n").trim();
-  return `-----BEGIN ${label}-----\n${b64}\n-----END ${label}-----`;
-}
-
-function makeName(cn, organization) {
-  const attributes = [derSet(derSeq(derOid("2.5.4.3"), derUtf8(cn)))];
-  if (organization) attributes.push(derSet(derSeq(derOid("2.5.4.10"), derUtf8(organization))));
-  return derSeq(...attributes);
-}
-
-async function makeSyntheticKeyboxXml(deviceId = "test-device-1") {
-  const keyPair = await crypto.subtle.generateKey(
-    {
-      name: "RSASSA-PKCS1-v1_5",
-      modulusLength: 2048,
-      publicExponent: Uint8Array.of(1, 0, 1),
-      hash: "SHA-256",
-    },
-    true,
-    ["sign", "verify"],
-  );
-  const spki = new Uint8Array(await crypto.subtle.exportKey("spki", keyPair.publicKey));
-  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey));
-  const sigAlg = derSeq(derOid("1.2.840.113549.1.1.11"), derNull());
-  const name = makeName("KeyBox Checker Sample Device", "Google LLC");
-  const validity = derSeq(derUtc("250101000000Z"), derUtc("350101000000Z"));
-  const tbs = derSeq(
-    derContext(0, derInt(2)),
-    derInt(Uint8Array.of(0x42, 0x11, 0x22)),
-    sigAlg,
-    name,
-    validity,
-    name,
-    spki,
-  );
-  const signature = new Uint8Array(await crypto.subtle.sign({ name: "RSASSA-PKCS1-v1_5" }, keyPair.privateKey, tbs));
-  const cert = derSeq(tbs, sigAlg, derBitString(signature));
-  const privateKeyPem = pem("PRIVATE KEY", pkcs8);
-  const certPem = pem("CERTIFICATE", cert);
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<AndroidAttestation>
-  <NumberOfKeyboxes>1</NumberOfKeyboxes>
-  <Keybox DeviceID="${deviceId}">
-    <Key algorithm="rsa">
-      <PrivateKey format="pem">
-${privateKeyPem}
-      </PrivateKey>
-      <CertificateChain>
-        <NumberOfCertificates>1</NumberOfCertificates>
-        <Certificate format="pem">
-${certPem}
-        </Certificate>
-      </CertificateChain>
-    </Key>
-  </Keybox>
-</AndroidAttestation>`;
-  return { xml, certPem };
-}
-
-async function testAll() {
-  console.log("1. Generating test keybox...");
-  const { xml } = await makeSyntheticKeyboxXml("pixel-8-pro-test");
-
-  console.log("2. Uploading keybox via POST /api/upload...");
-  const uploadRes = await fetch("http://127.0.0.1:8098/api/upload", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ xml })
+for (const privateKey of ["mismatch", "missing", "malformed"]) {
+  test(`${privateKey} private key is rejected with 422 and nothing stored`, async () => {
+    const bad = makeKeybox({ serial: 4010, privateKey });
+    s.state.trust = trustFor(bad.certPem);
+    const res = await postJson(s.base, "/api/upload", { xml: bad.xml });
+    assert.equal(res.status, 422);
+    assert.equal(count(), 0);
   });
-  const uploadData = await uploadRes.json();
-  console.log("Upload result:", uploadData);
-  assert.equal(uploadData.success, true);
-  assert.equal(uploadData.status, "strong");
-  const keyId = uploadData.id;
-
-  console.log("3. Testing GET /api/status...");
-  const statusRes = await fetch("http://127.0.0.1:8098/api/status");
-  const statusData = await statusRes.json();
-  console.log("Status result:", statusData);
-  assert.equal(statusData.status, "strong");
-  assert.equal(statusData.strong_count, 1);
-
-  console.log("4. Testing GET /api/download...");
-  const dlRes = await fetch("http://127.0.0.1:8098/api/download");
-  assert.equal(dlRes.status, 200);
-  const dlText = await dlRes.text();
-  assert.ok(dlText.includes("pixel-8-pro-test"));
-
-  console.log("5. Testing GET /api/update...");
-  const updateRes = await fetch("http://127.0.0.1:8098/api/update");
-  const updateData = await updateRes.json();
-  console.log("Update result:", updateData);
-  assert.equal(updateData.status, "strong");
-  assert.ok(updateData.last_updated);
-
-  console.log("6. Testing POST /api/report (5 times threshold)...");
-  for (let i = 1; i <= 6; i++) {
-    const reportRes = await fetch("http://127.0.0.1:8098/api/report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: keyId })
-    });
-    const reportData = await reportRes.json();
-    console.log(`Report #${i}:`, reportData);
-  }
-
-  console.log("7. Checking status after reports (should transition to 'device')...");
-  const statusAfterReport = await (await fetch("http://127.0.0.1:8098/api/status")).json();
-  console.log("Status after reports:", statusAfterReport);
-  assert.equal(statusAfterReport.status, "device");
-  assert.equal(statusAfterReport.device_count, 1);
-  assert.equal(statusAfterReport.strong_count, 0);
-
-  console.log("All API tests PASSED successfully!");
 }
 
-testAll().catch(e => {
-  console.error("Test failed:", e);
-  process.exit(1);
+test("revoked key is rejected with 422 and nothing stored", async () => {
+  s.state.trust = revoke(trustFor(rsa.certPem), 4001);
+  const res = await postJson(s.base, "/api/upload", { xml: rsa.xml });
+  assert.equal(res.status, 422);
+  assert.equal(count(), 0);
+});
+
+test("invalid duplicate of a stored key is validated first and rejected", async () => {
+  await postJson(s.base, "/api/upload", { xml: rsa.xml });
+  s.state.trust = revoke(trustFor(rsa.certPem), 4001);
+  const res = await postJson(s.base, "/api/upload", { xml: rsa.xml });
+  assert.equal(res.status, 422);
+  assert.equal(count(), 1);
+});
+
+test("valid duplicate is skipped", async () => {
+  await postJson(s.base, "/api/upload", { xml: rsa.xml });
+  const data = await (await postJson(s.base, "/api/upload", { xml: rsa.xml })).json();
+  assert.equal(data.skipped, true);
+  assert.equal(count(), 1);
+});
+
+test("URL upload uses mocked fetch only", async () => {
+  s.state.urlBodies["https://example.test/keybox.xml"] = rsa.xml;
+  const res = await postJson(s.base, "/api/upload", { url: "https://example.test/keybox.xml" });
+  assert.equal(res.status, 200);
+  assert.deepEqual(s.state.fetched, ["https://example.test/keybox.xml"]);
+  assert.equal(count(), 1);
+});
+
+test("trust refresh failure leaves the DB untouched", async () => {
+  await postJson(s.base, "/api/upload", { xml: rsa.xml });
+  const original = s.trustManager.refreshTrustData;
+  s.trustManager.refreshTrustData = async () => { throw new Error("status fetch failed"); };
+  try {
+    const res = await postJson(s.base, "/api/upload", { xml: ec.xml });
+    assert.ok(res.status >= 400);
+    assert.equal(count(), 1);
+  } finally {
+    s.trustManager.refreshTrustData = original;
+  }
 });

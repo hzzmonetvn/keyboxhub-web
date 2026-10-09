@@ -279,7 +279,7 @@
           <span class="stat-icon" aria-hidden="true">⊘</span>
           <span class="stat-value text-danger" id="stat-banned">0</span>
           <span class="stat-label" data-i18n="statBanned"
-            >Bị Ban (Xóa sau 24h)</span
+            >Đã Thu Hồi (Xóa Ngay)</span
           >
           <span class="stat-hint" data-i18n="statBannedHint"></span>
         </div>
@@ -744,7 +744,7 @@
             </div>
             <p data-i18n="tableSubtitle">
               Tự động cập nhật & auto-loot mỗi 1 giờ.
-              <em>Key bị thu hồi tự động xóa sau 24h. Bỏ qua trùng lặp.</em>
+              <em>Key bị thu hồi tự động xóa ngay lập tức. Bỏ qua trùng lặp.</em>
             </p>
           </div>
 
@@ -823,7 +823,6 @@
                 <th data-i18n="thSource">Nguồn gốc</th>
                 <th data-i18n="thReport">Báo cáo Device</th>
                 <th data-i18n="thUploaded">Tải lên lúc</th>
-                <th data-i18n="thPurge">Hạn xóa (nếu bị ban)</th>
                 <th data-i18n="thActions">Thao tác</th>
               </tr>
             </thead>
@@ -1142,8 +1141,7 @@ curl -X POST -H "Content-Type: application/xml" --data-binary @broken.xml https:
             rel="noopener"
             >KeyBoxChecker</a
           >
-          &bull; Periodic Google CRL Recheck & 3rd-Party Auto-Looter &bull; 24h
-          Auto-Purge
+          &bull; Periodic Google CRL Recheck & 3rd-Party Auto-Looter &bull; Revoked Keys Purged Immediately
         </p>
       </div>
     </footer>

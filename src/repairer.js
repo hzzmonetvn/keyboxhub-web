@@ -167,7 +167,7 @@ export async function reorderAndCompleteChain(privateKeyPem, certificatesPem) {
       const parsed = parseCertificatePem(stdPem);
       parsedCerts.push({ pem: stdPem, parsed });
     } catch (e) {
-      fixes.push(`Removed malformed certificate: ${e.message}`);
+      throw new Error(`Malformed certificate: ${e.message}`);
     }
   }
 
@@ -462,6 +462,7 @@ export async function repairKeybox(rawInput, trustData = null) {
   const repairedKeyboxes = [];
 
   for (const kb of parsed.keyboxes) {
+    if (!kb.keys.length) throw new Error("Keybox contains no keys");
     let deviceId = kb.deviceId;
     if (!deviceId || deviceId === "Unknown" || deviceId === "") {
       deviceId = "Standard-Android-" + Math.random().toString(36).slice(2, 10);
@@ -471,7 +472,7 @@ export async function repairKeybox(rawInput, trustData = null) {
     const repairedKeys = [];
 
     for (const key of kb.keys) {
-      if (!key.privateKeyPem) continue;
+      if (!key.privateKeyPem) throw new Error("Key is missing its private key");
 
       // 1. Standardize Private Key
       const privResult = standardizePrivateKey(key.privateKeyPem, key.algorithm);
@@ -532,7 +533,7 @@ export async function repairKeybox(rawInput, trustData = null) {
 ================================================================================
  Keybox Hub | Play Integrity & Attestation Engine
  Tổng hợp & Chuẩn hóa bởi / Aggregated & Repaired by: https://keybox.hzzmonet.io.vn
- Device ID: ${primaryDeviceId}
+ Device ID: ${primaryDeviceId.replace(/--/g, "- -").replace(/>/g, "&gt;")}
  Repaired: ${now}
  Modules Supported: TrickyStore, PlayIntegrityFork, APatch, KernelSU, Magisk
 ================================================================================
@@ -542,7 +543,8 @@ export async function repairKeybox(rawInput, trustData = null) {
 `;
 
   for (const kb of repairedKeyboxes) {
-    xml += `    <Keybox DeviceID="${kb.deviceId}">\n`;
+    const deviceId = kb.deviceId.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    xml += `    <Keybox DeviceID="${deviceId}">\n`;
     for (const k of kb.keys) {
       xml += `        <Key algorithm="${k.algorithm}">\n`;
       xml += `            <PrivateKey format="pem">\n`;

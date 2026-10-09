@@ -28,11 +28,11 @@ Any modification to the system **must respect these non-negotiable rules**:
    - **Device Fallback**: The API only falls back to random `status = 'device'` keys when there are zero `strong` keys available.
    - **Banned Response**: If all keys are revoked or no keys exist, return HTTP 404 with `status = "banned"`.
 
-3. **24-Hour Banned Key Purge Policy**:
-   - When a key fails attestation or Google revokes its certificates, its status is changed to `'banned'` and `banned_at` is stamped with the current ISO timestamp.
-   - **Banned keys are preserved for exactly 24 hours** so users and clients can inspect which keys were revoked and when.
-   - Once `banned_at <= now - 24 hours`, the background job automatically and permanently deletes them (`DELETE FROM keyboxes WHERE status = 'banned' AND banned_at <= ...`).
-   - **Valid keys (`strong` or `device`) are NEVER deleted automatically.**
+3. **Immediate Invalid Key Purge Policy**:
+   - Uploads must prove possession of the leaf private key, validate the certificate chain to a trusted Google root, and pass current revocation checks before duplicate detection or insertion.
+   - Unknown signers and invalid/revoked keys are rejected, never stored. Harmless formatting warnings do not override security failures.
+   - Rechecks immediately delete confirmed invalid/revoked keyboxes and their reports. Existing banned rows are purged without a retention period.
+   - Valid keys (`strong` or `device`, including softbanned Device keys) are preserved. Missing trust data or failed refreshes must not cause deletion or acceptance using stale revocation data.
 
 4. **Duplicate Prevention by Leaf Certificate Serial (Skip on Match)**:
    - When importing or uploading keys (single file, multi-file, ZIP archive, URL link, or 3rd-party looter):

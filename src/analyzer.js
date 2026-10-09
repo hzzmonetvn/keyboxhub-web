@@ -1,3 +1,5 @@
+import { createPrivateKey, createPublicKey, randomBytes, sign, verify } from "node:crypto";
+
 const TEXT_OIDS = {
   "2.5.4.3": "commonName",
   "2.5.4.5": "serialNumber",
@@ -119,45 +121,6 @@ function pemToDer(pem, label) {
   const m = pem.match(re) || pem.match(/-----BEGIN [^-]+-----([\s\S]*?)-----END [^-]+-----/i);
   if (!m) throw new Error(`Invalid PEM${label ? ` (${label})` : ""}`);
   return base64ToBytes(m[1], `PEM${label ? ` ${label}` : ""}`);
-}
-
-function concatBytes(...parts) {
-  const len = parts.reduce((n, p) => n + p.length, 0);
-  const out = new Uint8Array(len);
-  let o = 0;
-  for (const p of parts) { out.set(p, o); o += p.length; }
-  return out;
-}
-
-function derLen(len) {
-  if (len < 128) return Uint8Array.of(len);
-  const bytes = [];
-  while (len) { bytes.unshift(len & 0xff); len >>= 8; }
-  return Uint8Array.of(0x80 | bytes.length, ...bytes);
-}
-
-function derWrap(tag, value) { return concatBytes(Uint8Array.of(tag), derLen(value.length), value); }
-function derSeq(...parts) { return derWrap(0x30, concatBytes(...parts)); }
-function derNull() { return Uint8Array.of(0x05, 0x00); }
-function derInt(value) {
-  let v = trimPositive(value);
-  if (v.length === 0) v = Uint8Array.of(0);
-  if (v[0] & 0x80) v = concatBytes(Uint8Array.of(0), v);
-  return derWrap(0x02, v);
-}
-function derBitString(value) { return derWrap(0x03, concatBytes(Uint8Array.of(0), value)); }
-
-function derOid(dotted) {
-  const nums = dotted.split(".").map(BigInt);
-  const out = [Number(nums[0] * 40n + nums[1])];
-  for (const n0 of nums.slice(2)) {
-    let n = n0;
-    const stack = [Number(n & 0x7fn)];
-    n >>= 7n;
-    while (n) { stack.unshift(Number((n & 0x7fn) | 0x80n)); n >>= 7n; }
-    out.push(...stack);
-  }
-  return derWrap(0x06, Uint8Array.from(out));
 }
 
 function trimPositive(bytes) {
@@ -301,46 +264,6 @@ function parseCertificateDer(der) {
   };
 }
 
-function rsaSpkiFromPrivateKeyDer(der) {
-  const seq = attachSource(parseDer(der), der);
-  const n = seq.children[1].value;
-  const e = seq.children[2].value;
-  const rsaPub = derSeq(derInt(n), derInt(e));
-  return derSeq(derSeq(derOid("1.2.840.113549.1.1.1"), derNull()), derBitString(rsaPub));
-}
-
-function ecSpkiFromSec1Der(der, outerCurveOid) {
-  const seq = attachSource(parseDer(der), der);
-  let curveOid = outerCurveOid;
-  let publicPoint;
-  for (const child of seq.children) {
-    if (child.tag === 0xa0 && child.children[0]?.tag === 0x06) curveOid = oidFromNode(child.children[0]);
-    if (child.tag === 0xa1 && child.children[0]?.tag === 0x03) {
-      const bit = child.children[0].value;
-      if (bit[0] !== 0) throw new Error("Unsupported EC public key bit string padding");
-      publicPoint = bit.subarray(1);
-    }
-  }
-  if (!curveOid) throw new Error("EC private key missing curve parameters");
-  if (!publicPoint) throw new Error("EC private key missing public key point");
-  return derSeq(derSeq(derOid("1.2.840.10045.2.1"), derOid(curveOid)), derBitString(publicPoint));
-}
-
-function spkiFromPrivateKeyPem(pem) {
-  if (/BEGIN RSA PRIVATE KEY/.test(pem)) return rsaSpkiFromPrivateKeyDer(pemToDer(pem, "RSA PRIVATE KEY"));
-  if (/BEGIN EC PRIVATE KEY/.test(pem)) return ecSpkiFromSec1Der(pemToDer(pem, "EC PRIVATE KEY"));
-  if (/BEGIN PRIVATE KEY/.test(pem)) {
-    const der = pemToDer(pem, "PRIVATE KEY");
-    const seq = attachSource(parseDer(der), der);
-    const alg = seq.children[1];
-    const algOid = oidFromNode(alg.children[0]);
-    const inner = seq.children[2].value;
-    if (algOid === "1.2.840.113549.1.1.1") return rsaSpkiFromPrivateKeyDer(inner);
-    if (algOid === "1.2.840.10045.2.1") return ecSpkiFromSec1Der(inner, oidFromNode(alg.children[1]));
-  }
-  throw new Error("Unsupported private key PEM format");
-}
-
 function signatureToWebCrypto(sigDer, family, issuerCert) {
   if (family !== "ecdsa") return sigDer;
   const size = CURVES[issuerCert.curveOid]?.size;
@@ -434,7 +357,11 @@ function worse(a, b) {
 export async function analyzeKeybox(xmlText, trustData, now = new Date()) {
   const parsed = parseKeyboxXml(xmlText);
   const trustRoots = makeTrustRoots(trustData);
-  const statusEntries = trustData.status?.entries || {};
+  if (!trustRoots.some(root => root.kind === "google_hardware" && root.level === "trusted") ||
+      !trustData.status?.entries || typeof trustData.status.entries !== "object" || Array.isArray(trustData.status.entries)) {
+    throw new Error("Trusted roots or revocation data unavailable; validation cannot proceed");
+  }
+  const statusEntries = trustData.status.entries;
   const result = {
     overall: "pass",
     checkedAtUtc: now.toISOString(),
@@ -456,6 +383,10 @@ export async function analyzeKeybox(xmlText, trustData, now = new Date()) {
 
   for (const kb of parsed.keyboxes) {
     const kbOut = { deviceId: kb.deviceId, keys: [] };
+    if (!kb.keys.length) {
+      result.errors.push(`Keybox ${kb.deviceId} contains no keys`);
+      result.overall = worse(result.overall, "fail");
+    }
     for (const key of kb.keys) {
       const keyOut = {
         algorithm: key.algorithm,
@@ -477,11 +408,16 @@ export async function analyzeKeybox(xmlText, trustData, now = new Date()) {
         }
         const certs = key.certificatesPem.map(parseCertificatePem);
         keyOut.certificates = certs.map(certPublicView);
-        const leafSpki = certs[0]?.spkiDer;
-        const privateSpki = spkiFromPrivateKeyPem(normalizePrivateKeyText(key.privateKeyPem));
-        keyOut.privateKey.matchesLeafCertificate = bytesEqual(privateSpki, leafSpki);
+        if (!certs.length) throw new Error("Certificate chain is empty");
+        const privateKey = createPrivateKey(normalizePrivateKeyText(key.privateKeyPem));
+        const leafKey = createPublicKey({ key: Buffer.from(certs[0].spkiDer), format: "der", type: "spki" });
+        const challenge = randomBytes(32);
+        keyOut.privateKey.matchesLeafCertificate = verify("sha256", challenge, leafKey, sign("sha256", challenge, privateKey));
         keyOut.privateKey.status = keyOut.privateKey.matchesLeafCertificate ? "pass" : "fail";
-        if (!keyOut.privateKey.matchesLeafCertificate) keyOut.status = worse(keyOut.status, "fail");
+        if (!keyOut.privateKey.matchesLeafCertificate) {
+          keyOut.status = worse(keyOut.status, "fail");
+          keyOut.errors.push("Private key cannot sign for the leaf certificate");
+        }
 
         const timeChecks = certs.map((cert, idx) => {
           const role = idx === 0 ? "leaf" : idx === certs.length - 1 ? "root" : "intermediate";
@@ -509,14 +445,17 @@ export async function analyzeKeybox(xmlText, trustData, now = new Date()) {
           });
           chainValid &&= issuerMatch && signatureValid;
         }
+        const rootCert = certs.at(-1);
+        const rootSignatureValid = bytesEqual(rootCert.issuerDer, rootCert.subjectDer) && await verifyCertificateSignature(rootCert, rootCert);
+        keyOut.chain.checks.push({ status: rootSignatureValid ? "pass" : "fail", message: "Root certificate self-signature", signatureValid: rootSignatureValid });
+        chainValid &&= rootSignatureValid;
         keyOut.chain.valid = chainValid;
         if (!chainValid) keyOut.status = worse(keyOut.status, "fail");
 
-        const rootCert = certs.at(-1);
         keyOut.root = classifyRoot(rootCert, trustRoots);
         if (!keyOut.root.recognized) {
-          keyOut.status = worse(keyOut.status, "warn");
-          keyOut.warnings.push("Signer is not a production Google hardware attestation root.");
+          keyOut.status = worse(keyOut.status, "fail");
+          keyOut.errors.push("Signer is not a production Google hardware attestation root.");
         }
 
         for (const cert of certs) {
@@ -538,11 +477,15 @@ export async function analyzeKeybox(xmlText, trustData, now = new Date()) {
         if (keyOut.revocation.hits.length) {
           keyOut.revocation.status = "fail";
           keyOut.status = worse(keyOut.status, "fail");
+          keyOut.errors.push("Certificate has been revoked by Google CRL");
         }
       } catch (error) {
         keyOut.status = "error";
         keyOut.errors.push(error instanceof Error ? error.message : String(error));
       }
+      keyOut.errors.push(...keyOut.chain.checks.filter(check => check.status === "fail").map(check => check.message));
+      result.errors.push(...keyOut.errors);
+      result.warnings.push(...keyOut.warnings);
       result.overall = worse(result.overall, keyOut.status);
       kbOut.keys.push(keyOut);
     }

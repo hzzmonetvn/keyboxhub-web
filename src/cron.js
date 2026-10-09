@@ -5,18 +5,18 @@ import { fetchAndLootThirdPartySources } from "./source-fetcher.js";
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 export async function runFullHourlyCycle() {
-  console.log("[Cron] Running 1-hour cycle: Google CRL update -> DB keybox recheck -> 3rd-party source loot -> 24h purge...");
+  console.log("[Cron] Running 1-hour cycle: Google CRL update -> DB keybox recheck -> 3rd-party source loot -> purge revoked keys...");
   try {
     // 1. Fetch freshest Google attestation status & roots
     const trustData = await trustManager.refreshTrustData(true);
 
-    // 2. Re-verify all existing keyboxes in database
+    // 2. Re-verify all existing keyboxes in database (purges revoked keys immediately)
     await recheckAllKeysInDb(trustData);
 
     // 3. Fetch from 3rd-party sources, test, and loot Strong keys (skip duplicates)
     await fetchAndLootThirdPartySources(trustData);
 
-    // 4. Clean up banned keys older than 24 hours
+    // 4. Clean up any remaining banned keys
     cleanupOldBannedKeys();
 
     console.log("[Cron] 1-hour cycle successfully completed.");

@@ -46,7 +46,7 @@ const translations = {
     priorityNote: "Ưu tiên Strong Integrity, dự phòng Device.",
     fileDescription: "Android Attestation · Tệp chứng thực",
     statTotalHint: "Tất cả key trong hệ thống",
-    statBannedHint: "Tự động xóa sau 24 giờ",
+    statBannedHint: "Tự động xóa ngay khi bị thu hồi",
     statDeviceHint: "Dự phòng khi hết Strong",
     statStrongHint: "Ưu tiên cấp phát",
     scrollTable: "Bảng dữ liệu, cuộn ngang để xem thêm",
@@ -91,7 +91,7 @@ const translations = {
     btnUploadSubmit: "Kiểm tra & tải lên",
     resultTitle: "Kết Quả Kiểm Tra Chi Tiết",
     tableTitle: "Kho keybox",
-    tableSubtitle: "Tìm và tải keybox theo trạng thái. Key bị thu hồi được giữ lại trong 24 giờ.",
+    tableSubtitle: "Tìm và tải keybox theo trạng thái. Key bị thu hồi sẽ tự động xóa ngay lập tức.",
     searchPlaceholder: "Tìm ID, thiết bị, nguồn…",
     filterAll: "Tất cả",
     btnCheckAll: "Kiểm tra toàn bộ",
@@ -127,7 +127,7 @@ const translations = {
     apiDescUpload: "Upload đơn lẻ, nhiều file, ZIP hoặc qua link URL (Tự bỏ qua trùng lặp)",
     apiDescStatus: "Kiểm tra trạng thái hệ thống (strong / device / banned)",
     apiDescReport: "Báo cáo key bị hạ cấp xuống Device (trên 5 phiếu chuyển sang device)",
-    footerText: "Powered by KeyBoxChecker · Kiểm tra CRL & quét nguồn mỗi giờ · Xóa key thu hồi sau 24 giờ",
+    footerText: "Powered by KeyBoxChecker · Kiểm tra CRL & quét nguồn mỗi giờ · Tự động xóa ngay khi bị thu hồi",
     btnCopy: "Copy",
     btnDownloadRow: "Tải",
     btnReportDevice: "Báo Device",
@@ -214,7 +214,7 @@ const translations = {
     priorityNote: "Strong Integrity first, Device as a fallback.",
     fileDescription: "Android Attestation · Certificate file",
     statTotalHint: "All keys in the repository",
-    statBannedHint: "Automatically purged after 24h",
+    statBannedHint: "Automatically purged immediately",
     statDeviceHint: "Fallback when Strong runs out",
     statStrongHint: "First in download priority",
     scrollTable: "Data table, scroll horizontally for more",
@@ -259,7 +259,7 @@ const translations = {
     btnUploadSubmit: "Verify & upload",
     resultTitle: "Detailed Verification Result",
     tableTitle: "Keybox repository",
-    tableSubtitle: "Find and download keys by status. Revoked keys remain visible for 24 hours.",
+    tableSubtitle: "Find and download keys by status. Revoked keys are purged immediately.",
     searchPlaceholder: "Search ID, device, source…",
     filterAll: "All",
     btnCheckAll: "Recheck all keys",
@@ -295,7 +295,7 @@ const translations = {
     apiDescUpload: "Upload single, multiple files, ZIP or via direct URL link (skips duplicates)",
     apiDescStatus: "Check system status (strong / device / banned)",
     apiDescReport: "Report key downgraded to Device (promoted to device upon >5 votes)",
-    footerText: "Powered by KeyBoxChecker · Hourly CRL checks & source scans · Revoked keys purged after 24h",
+    footerText: "Powered by KeyBoxChecker · Hourly CRL checks & source scans · Revoked keys purged immediately",
     btnCopy: "Copy",
     btnDownloadRow: "Download",
     btnReportDevice: "Report Device",
@@ -404,6 +404,10 @@ function applyLanguage(lang) {
   renderNotificationSubscribers();
 }
 
+function escapeHTML(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 // Toast Notification Utility
 function showToast(message, type = "info", duration = 3800) {
   const container = document.getElementById("toast-container");
@@ -423,9 +427,11 @@ function showToast(message, type = "info", duration = 3800) {
 
   toast.innerHTML = `
     <div style="flex-shrink:0; display:flex; align-items:center;">${iconSvg}</div>
-    <div style="flex:1; line-height:1.4;">${message}</div>
-    <button style="background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:1.1rem; line-height:1; padding:2px;" onclick="this.parentElement.remove()">&times;</button>
+    <div class="toast-msg" style="flex:1; line-height:1.4;"></div>
+    <button class="toast-close" style="background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:1.1rem; line-height:1; padding:2px;">&times;</button>
   `;
+  toast.querySelector(".toast-msg").textContent = message;
+  toast.querySelector(".toast-close").addEventListener("click", () => toast.remove());
 
   container.appendChild(toast);
 
@@ -549,20 +555,6 @@ function formatTime(isoString) {
   }
 }
 
-// Calculate remaining time before 24h deletion
-function formatRemainingBannedTime(bannedAtIso) {
-  if (!bannedAtIso) return t("pendingPurge");
-  const bannedTime = new Date(bannedAtIso).getTime();
-  const deleteTime = bannedTime + 24 * 60 * 60 * 1000;
-  const now = Date.now();
-  const diffMs = deleteTime - now;
-
-  if (diffMs <= 0) return t("aboutToPurge");
-  const hours = Math.floor(diffMs / (3600 * 1000));
-  const mins = Math.floor((diffMs % (3600 * 1000)) / (60 * 1000));
-  return `${t("purgeIn")}${hours}h ${mins}m`;
-}
-
 // Fetch and render System Status
 async function loadStatus() {
   try {
@@ -573,7 +565,7 @@ async function loadStatus() {
     const data = await res.json();
 
     systemStatusBadge.className = `status-badge status-${data.status}`;
-    systemStatusText.textContent = data.status.toUpperCase();
+    systemStatusText.textContent = (data.status === "strong" || data.status === "device") ? data.status.toUpperCase() : t("noValidKey");
 
     if (data.status === "strong") {
       systemStatusDesc.textContent = t("statusStrongDesc");
@@ -656,7 +648,7 @@ function renderKeysTable() {
     const emptyMsg = allKeysData.length === 0 ? t("noKeysInDb") : t("noKeysFound");
     keysTableBody.innerHTML = `
       <tr>
-        <td colspan="10" class="text-center py-4" style="color:var(--text-dim);">${emptyMsg}</td>
+        <td colspan="9" class="text-center py-4" style="color:var(--text-dim);">${emptyMsg}</td>
       </tr>
     `;
     return;
@@ -665,10 +657,9 @@ function renderKeysTable() {
   keysTableBody.innerHTML = filtered.map(k => {
     const isStrong = k.status === "strong";
     const isDevice = k.status === "device";
-    const isBanned = k.status === "banned";
     const badgeClass = isStrong ? "badge-strong" : (isDevice ? "badge-device" : "badge-banned");
 
-    let statusBadge = `<span class="badge-tag ${badgeClass}">${k.status}</span>`;
+    let statusBadge = `<span class="badge-tag ${badgeClass}">${escapeHTML(k.status)}</span>`;
     if (k.is_softbanned) {
       statusBadge = `<span class="badge-tag badge-softban" title="${t("badgeSoftbanTip")}">
         <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:2px; vertical-align:text-top;">
@@ -680,16 +671,11 @@ function renderKeysTable() {
       </span>`;
     }
 
-    let noteHtml = `<span style="color:var(--text-dim);">${t("normalStatus")}</span>`;
-    if (isBanned) {
-      noteHtml = `<span class="text-danger" title="${formatTime(k.banned_at)}">${formatRemainingBannedTime(k.banned_at)}</span>`;
-    }
-
-    let sourceBadge = `<span class="badge-tag badge-device">${k.source || "User"}</span>`;
+    let sourceBadge = `<span class="badge-tag badge-device">${escapeHTML(k.source || "User")}</span>`;
     if (k.source?.includes("Specter")) {
-      sourceBadge = `<span class="badge-tag badge-strong" title="${k.source}">${k.source}</span>`;
+      sourceBadge = `<span class="badge-tag badge-strong" title="${escapeHTML(k.source)}">${escapeHTML(k.source)}</span>`;
     } else if (k.source?.startsWith("http")) {
-      sourceBadge = `<span class="badge-tag badge-device" title="${k.source}">URL Link</span>`;
+      sourceBadge = `<span class="badge-tag badge-device" title="${escapeHTML(k.source)}">URL Link</span>`;
     }
 
     const fullSerial = k.primary_serial || (k.serials && k.serials[0]) || "";
@@ -700,8 +686,8 @@ function renderKeysTable() {
     const serialCell = fullSerial ? `
       <td>
         <div style="display:flex; align-items:center; gap:6px;">
-          <code style="font-size:0.75rem;" title="${fullSerial}">${shortSerial}</code>
-          <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.7rem;" title="Copy Serial" onclick="copyText('${fullSerial}')">
+          <code style="font-size:0.75rem;" title="${escapeHTML(fullSerial)}">${escapeHTML(shortSerial)}</code>
+          <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.7rem;" title="Copy Serial" data-copy="${escapeHTML(fullSerial)}">
             ${t("btnCopy")}
           </button>
         </div>
@@ -710,17 +696,17 @@ function renderKeysTable() {
 
     return `
       <tr>
-        <td><strong>#${k.id}</strong></td>
+        <td><strong>#${Number(k.id)}</strong></td>
         <td>
           <div style="display:flex; align-items:center; gap:6px;">
-            <span title="${k.device_id}"><strong>${k.device_id || "N/A"}</strong></span>
-            <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.7rem;" title="Copy Device ID" onclick="copyText('${k.device_id}')">
+            <span title="${escapeHTML(k.device_id)}"><strong>${escapeHTML(k.device_id || "N/A")}</strong></span>
+            <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.7rem;" title="Copy Device ID" data-copy="${escapeHTML(k.device_id)}">
               ${t("btnCopy")}
             </button>
           </div>
         </td>
         ${serialCell}
-        <td><code>${k.algorithm || "rsa"}</code></td>
+        <td><code>${escapeHTML(k.algorithm || "rsa")}</code></td>
         <td>${statusBadge}</td>
         <td><small>${sourceBadge}</small></td>
         <td>
@@ -728,17 +714,16 @@ function renderKeysTable() {
           ${k.report_count > 5 ? '<small class="text-warning"> (Device)</small>' : ''}
         </td>
         <td><small>${formatTime(k.uploaded_at)}</small></td>
-        <td><small>${noteHtml}</small></td>
         <td>
           <div style="display: flex; gap: 6px; align-items: center;">
-            <a href="/api/download?id=${k.id}" class="btn btn-secondary btn-sm" download="keybox_${k.id}.xml" title="Download XML">
+            <a href="/api/download?id=${Number(k.id)}" class="btn btn-secondary btn-sm" download="keybox_${Number(k.id)}.xml" title="Download XML">
               ${t("btnDownloadRow")}
             </a>
-            <button class="btn btn-secondary btn-sm" onclick="copyKeyXml(${k.id})" title="Copy XML to Clipboard">
+            <button class="btn btn-secondary btn-sm" data-copy-xml="${Number(k.id)}" title="Copy XML to Clipboard">
               XML
             </button>
             ${k.status === "strong" ? `
-              <button class="btn btn-danger-outline btn-sm" onclick="reportKey(${k.id})" title="Report key as Device Integrity">
+              <button class="btn btn-danger-outline btn-sm" data-report="${Number(k.id)}" title="Report key as Device Integrity">
                 ${t("btnReportDevice")}
               </button>
             ` : ''}
@@ -748,6 +733,14 @@ function renderKeysTable() {
     `;
   }).join("");
 }
+
+keysTableBody.addEventListener("click", e => {
+  const b = e.target.closest("[data-copy],[data-copy-xml],[data-report]");
+  if (!b) return;
+  if (b.dataset.copy !== undefined) copyText(b.dataset.copy);
+  else if (b.dataset.copyXml) copyKeyXml(Number(b.dataset.copyXml));
+  else reportKey(Number(b.dataset.report));
+});
 
 // Fetch Key list from server
 async function loadKeys() {
@@ -763,7 +756,7 @@ async function loadKeys() {
     console.error("Error loading keys:", err);
     keysTableBody.innerHTML = `
       <tr>
-        <td colspan="9" class="text-center py-4 text-danger">${t("connError")}: ${err.message}</td>
+        <td colspan="9" class="text-center py-4 text-danger">${t("connError")}: ${escapeHTML(err.message)}</td>
       </tr>
     `;
   }
@@ -1084,23 +1077,41 @@ btnSubmitUpload.addEventListener("click", async () => {
     const result = await res.json();
     displayAnalysisResult(result);
 
-    if (result.success) {
-      showToast(result.message || t("uploadSuccess"), "success", 4500);
-      uploadStatus.innerHTML = `<span class="text-success">${result.message || t("uploadSuccess")}</span>`;
-      selectedFiles = [];
-      fileInput.value = "";
-      fileNameDisplay.textContent = "";
-      xmlTextInput.value = "";
-      if (keyboxUrlInput) keyboxUrlInput.value = "";
+    const added = result.newly_added || 0;
+    const skipped = result.skipped_count || 0;
+    const rejected = result.rejected_count ?? result.banned_count ?? 0;
+    const counts = currentLang === "vi"
+      ? `Thêm mới: ${added}, trùng: ${skipped}, bị từ chối: ${rejected}`
+      : `Added: ${added}, duplicate: ${skipped}, rejected: ${rejected}`;
+    const reasons = [...(result.analysis?.errors || []), ...(result.results || []).map(r => r.error).filter(Boolean)];
+    const reasonText = reasons.length ? ` ${[...new Set(reasons)].slice(0, 3).join("; ")}` : "";
+
+    if (!res.ok || !result.success) {
+      const msg = (result.error || result.message || t("uploadFailed")) + (result.error ? reasonText : "") + (rejected ? ` (${counts})` : "");
+      showToast(msg, "error");
+      uploadStatus.innerHTML = `<span class="text-danger">${escapeHTML(msg)}</span>`;
+    } else {
+      const msg = `${result.message || t("uploadSuccess")} (${counts})`;
+      if (rejected > 0 || added === 0) {
+        showToast(msg, "info", 6000);
+        uploadStatus.innerHTML = `<span class="text-warning">${escapeHTML(msg)}</span>`;
+      } else {
+        showToast(msg, "success", 4500);
+        uploadStatus.innerHTML = `<span class="text-success">${escapeHTML(msg)}</span>`;
+      }
+      if (rejected === 0) {
+        selectedFiles = [];
+        fileInput.value = "";
+        fileNameDisplay.textContent = "";
+        xmlTextInput.value = "";
+        if (keyboxUrlInput) keyboxUrlInput.value = "";
+      }
       await loadStatus();
       await loadKeys();
-    } else {
-      showToast(result.error || result.message || t("uploadFailed"), "error");
-      uploadStatus.innerHTML = `<span class="text-danger">${result.error || result.message || t("uploadFailed")}</span>`;
     }
   } catch (err) {
     showToast(t("connError") + ": " + err.message, "error");
-    uploadStatus.innerHTML = `<span class="text-danger">${err.message}</span>`;
+    uploadStatus.innerHTML = `<span class="text-danger">${escapeHTML(err.message)}</span>`;
   } finally {
     btnSubmitUpload.disabled = false;
     btnSubmitUpload.innerHTML = `
@@ -1120,9 +1131,9 @@ function displayAnalysisResult(data) {
     let html = `
       <div style="margin-bottom:16px;">
         <h4 style="font-size:1.05rem; font-weight:700;">
-          ${currentLang === "vi" ? `Kết quả xử lý hàng loạt (${data.valid_count}/${data.total_processed} hợp lệ)` : `Batch Processing Results (${data.valid_count}/${data.total_processed} valid)`}
+          ${currentLang === "vi" ? `Kết quả xử lý hàng loạt (thêm mới ${data.newly_added || 0}, trùng ${data.skipped_count || 0}, từ chối ${data.rejected_count ?? data.banned_count ?? 0} / ${data.total_processed})` : `Batch Processing Results (added ${data.newly_added || 0}, duplicate ${data.skipped_count || 0}, rejected ${data.rejected_count ?? data.banned_count ?? 0} of ${data.total_processed})`}
         </h4>
-        <p class="text-muted" style="font-size:0.88rem; margin-top:4px;">${data.message}</p>
+        <p class="text-muted" style="font-size:0.88rem; margin-top:4px;">${escapeHTML(data.message)}</p>
       </div>
       <div class="table-responsive">
         <table class="data-table">
@@ -1142,16 +1153,19 @@ function displayAnalysisResult(data) {
       const isStrong = item.status === "strong";
       const isDevice = item.status === "device";
       const isSkipped = item.skipped;
-      const badgeClass = isSkipped ? "badge-device" : (isStrong ? "badge-strong" : (isDevice ? "badge-device" : "badge-banned"));
-      const statusText = isSkipped ? (currentLang === "vi" ? "BỎ QUA (TRÙNG)" : "SKIPPED (DUP)") : (item.status || "ERROR");
+      const isRejected = !isSkipped && (item.success === false || item.status === "invalid" || item.status === "banned" || !!item.error);
+      const badgeClass = isRejected ? "badge-banned" : (isSkipped ? "badge-device" : (isStrong ? "badge-strong" : (isDevice ? "badge-device" : "badge-banned")));
+      const statusText = isSkipped ? (currentLang === "vi" ? "BỎ QUA (TRÙNG)" : "SKIPPED (DUP)") : (isRejected ? (currentLang === "vi" ? "TỪ CHỐI" : "REJECTED") : (item.status || "ERROR"));
+      const reasons = [item.error, ...(item.analysis?.errors || [])].filter(Boolean);
+      const detail = reasons.length ? [...new Set(reasons)].join("; ") : (item.message || "OK");
 
       html += `
         <tr>
-          <td><code>${item.filename}</code></td>
-          <td>${item.deviceId || "N/A"}</td>
-          <td>${item.algorithm || "N/A"}</td>
+          <td><code>${escapeHTML(item.filename)}</code></td>
+          <td>${escapeHTML(item.deviceId || "N/A")}</td>
+          <td>${escapeHTML(item.algorithm || "N/A")}</td>
           <td><span class="badge-tag ${badgeClass}">${statusText}</span></td>
-          <td><small>${item.message || item.error || "OK"}</small></td>
+          <td><small>${escapeHTML(detail)}</small></td>
         </tr>
       `;
     }
@@ -1170,12 +1184,13 @@ function displayAnalysisResult(data) {
   // Single file result
   const item = data.results ? data.results[0] : data;
   if (!item || (!item.analysis && !item.error)) {
-    analysisResultBody.innerHTML = `<p class="text-danger">${data.error || "No analysis available."}</p>`;
+    analysisResultBody.innerHTML = `<p class="text-danger">${escapeHTML(data.error || "No analysis available.")}</p>`;
     return;
   }
 
   const isSkipped = item.skipped;
-  const overall = item.analysis?.overall || (item.success ? "pass" : "fail");
+  const isRejected = !isSkipped && (item.success === false || item.status === "invalid" || item.status === "banned" || !!item.error);
+  const overall = isRejected ? "fail" : (item.analysis?.overall || (item.success ? "pass" : "fail"));
   const overallBadge = isSkipped ? `<span class="badge-tag badge-device">${currentLang === "vi" ? "BỎ QUA (TRÙNG LẶP)" : "SKIPPED (DUPLICATE)"}</span>`
                      : (overall === "pass" ? `<span class="badge-tag badge-strong">${currentLang === "vi" ? "HỢP LỆ (PASS)" : "VALID (PASS)"}</span>` 
                      : (overall === "warn" ? `<span class="badge-tag badge-device">${currentLang === "vi" ? "CẢNH BÁO (WARN)" : "WARNING (WARN)"}</span>` 
@@ -1185,25 +1200,25 @@ function displayAnalysisResult(data) {
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
       <div>
         <strong>${currentLang === "vi" ? "Đánh giá tổng quan:" : "Overall Evaluation:"}</strong> ${overallBadge}
-        <span style="margin-left: 14px;"><strong>${currentLang === "vi" ? "Trạng thái:" : "Status:"}</strong> <span class="badge-tag badge-${item.status || 'banned'}">${item.status || 'banned'}</span></span>
+        <span style="margin-left: 14px;"><strong>${currentLang === "vi" ? "Trạng thái:" : "Status:"}</strong> <span class="badge-tag badge-${item.status === "strong" || item.status === "device" ? item.status : "banned"}">${escapeHTML(item.status || "invalid")}</span></span>
       </div>
-      <div><strong>Device ID:</strong> <code>${item.deviceId || "N/A"}</code></div>
+      <div><strong>Device ID:</strong> <code>${escapeHTML(item.deviceId || "N/A")}</code></div>
     </div>
   `;
 
   if (item.message) {
-    html += `<div class="result-item text-primary"><strong>${currentLang === "vi" ? "Thông báo:" : "Message:"}</strong> ${item.message}</div>`;
+    html += `<div class="result-item text-primary"><strong>${currentLang === "vi" ? "Thông báo:" : "Message:"}</strong> ${escapeHTML(item.message)}</div>`;
   }
 
   if (item.error) {
-    html += `<div class="result-item text-danger"><strong>${currentLang === "vi" ? "Lỗi:" : "Error:"}</strong> ${item.error}</div>`;
+    html += `<div class="result-item text-danger"><strong>${currentLang === "vi" ? "Lỗi:" : "Error:"}</strong> ${escapeHTML(item.error)}</div>`;
   }
 
   if (item.analysis?.errors?.length) {
     html += `
       <div class="result-item text-danger">
         <strong>${currentLang === "vi" ? "Lỗi kiểm tra:" : "Verification Errors:"}</strong>
-        <ul>${item.analysis.errors.map(e => `<li>${e}</li>`).join("")}</ul>
+        <ul>${item.analysis.errors.map(e => `<li>${escapeHTML(e)}</li>`).join("")}</ul>
       </div>
     `;
   }
@@ -1212,7 +1227,7 @@ function displayAnalysisResult(data) {
     html += `
       <div class="result-item text-warning">
         <strong>${currentLang === "vi" ? "Cảnh báo:" : "Warnings:"}</strong>
-        <ul>${item.analysis.warnings.map(w => `<li>${w}</li>`).join("")}</ul>
+        <ul>${item.analysis.warnings.map(w => `<li>${escapeHTML(w)}</li>`).join("")}</ul>
       </div>
     `;
   }
@@ -1392,8 +1407,12 @@ if (btnSubmitRepair) {
       }
 
       lastRepairedXml = data.repairedXml;
-      repairStatus.innerHTML = `<span class="text-success">${t("repairSuccessToast")}</span>`;
-      showToast(t("repairSuccessToast"), "success");
+      const an = data.analysis;
+      const anBad = an && (an.overall === "fail" || data.status === "invalid" || data.status === "banned");
+      const anText = an ? (currentLang === "vi" ? ` Kiểm tra chứng chỉ: ${an.overall || data.status || "?"}.` : ` Certificate check: ${an.overall || data.status || "?"}.`) : "";
+      const anErr = (an?.errors || []).slice(0, 3).join("; ");
+      repairStatus.innerHTML = `<span class="${anBad ? "text-warning" : "text-success"}">${escapeHTML(t("repairSuccessToast") + anText + (anErr ? " " + anErr : ""))}</span>`;
+      showToast(t("repairSuccessToast") + anText, anBad ? "info" : "success", anBad ? 6000 : undefined);
 
       // Update fixes list
       if (repairFixesCount) {
@@ -1406,7 +1425,7 @@ if (btnSubmitRepair) {
       }
 
       if (repairFixesList) {
-        repairFixesList.innerHTML = (data.fixesApplied || []).map(f => `<li>${f}</li>`).join("");
+        repairFixesList.innerHTML = (data.fixesApplied || []).map(f => `<li>${escapeHTML(f)}</li>`).join("");
       }
 
       if (repairXmlCode) {
@@ -1418,7 +1437,7 @@ if (btnSubmitRepair) {
         repairOutputPanel.scrollIntoView({ behavior: "smooth" });
       }
     } catch (err) {
-      repairStatus.innerHTML = `<span class="text-danger">${err.message}</span>`;
+      repairStatus.innerHTML = `<span class="text-danger">${escapeHTML(err.message)}</span>`;
       showToast(`${t("connError")}: ${err.message}`, "error");
     } finally {
       btnSubmitRepair.disabled = false;

@@ -1,6 +1,6 @@
 {
-  "version": "live-2026-09-27",
-  "fetchedAt": "2026-09-27T00:38:07.556Z",
+  "version": "live-2026-10-09",
+  "fetchedAt": "2026-10-09T12:35:30.593Z",
   "status": {
     "entries": {
       "6681152659205225093": {
@@ -7022,6 +7022,22 @@
       "418dfed21da23472c85b22604dfe3e70": {
         "status": "REVOKED",
         "reason": "KEY_COMPROMISE"
+      },
+      "d5a8383f10343c90d17ac415df29657b": {
+        "status": "REVOKED",
+        "reason": "KEY_COMPROMISE"
+      },
+      "a8cdc334aa0c520e9465efc9a6ee77f7": {
+        "status": "REVOKED",
+        "reason": "KEY_COMPROMISE"
+      },
+      "1698420960673666191": {
+        "status": "REVOKED",
+        "reason": "KEY_COMPROMISE"
+      },
+      "15510740886364958753": {
+        "status": "REVOKED",
+        "reason": "KEY_COMPROMISE"
       }
     }
   },
@@ -7060,9 +7076,83 @@
       "kind": "samsung_knox",
       "level": "trusted",
       "pem": "  -----BEGIN PUBLIC KEY-----\n  MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBhbGuLrpql5I2WJmrE5kEVZOo+dgA\n  46mKrVJf/sgzfzs2u7M9c1Y9ZkCEiiYkhTFE9vPbasmUfXybwgZ2EM30A1ABPd12\n  4n3JbEDfsB/wnMH1AcgsJyJFPbETZiy42Fhwi+2BCA5bcHe7SrdkRIYSsdBRaKBo\n  ZsapxB0gAOs0jSPRX5M=\n  -----END PUBLIC KEY-----"
+    },
+    {
+      "id": "google_fetched_1",
+      "label": "Google hardware attestation root certificate (fetched #1)",
+      "kind": "google_hardware",
+      "level": "trusted",
+      "pem": "-----BEGIN CERTIFICATE-----\nMIIFHDCCAwSgAwIBAgIJAPHBcqaZ6vUdMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNV\nBAUTEGY5MjAwOWU4NTNiNmIwNDUwHhcNMjIwMzIwMTgwNzQ4WhcNNDIwMzE1MTgw\nNzQ4WjAbMRkwFwYDVQQFExBmOTIwMDllODUzYjZiMDQ1MIICIjANBgkqhkiG9w0B\nAQEFAAOCAg8AMIICCgKCAgEAr7bHgiuxpwHsK7Qui8xUFmOr75gvMsd/dTEDDJdS\nSxtf6An7xyqpRR90PL2abxM1dEqlXnf2tqw1Ne4Xwl5jlRfdnJLmN0pTy/4lj4/7\ntv0Sk3iiKkypnEUtR6WfMgH0QZfKHM1+di+y9TFRtv6y//0rb+T+W8a9nsNL/ggj\nnar86461qO0rOs2cXjp3kOG1FEJ5MVmFmBGtnrKpa73XpXyTqRxB/M0n1n/W9nGq\nC4FSYa04T6N5RIZGBN2z2MT5IKGbFlbC8UrW0DxW7AYImQQcHtGl/m00QLVWutHQ\noVJYnFPlXTcHYvASLu+RhhsbDmxMgJJ0mcDpvsC4PjvB+TxywElgS70vE0XmLD+O\nJtvsBslHZvPBKCOdT0MS+tgSOIfga+z1Z1g7+DVagf7quvmag8jfPioyKvxnK/Eg\nsTUVi2ghzq8wm27ud/mIM7AY2qEORR8Go3TVB4HzWQgpZrt3i5MIlCaY504LzSRi\nigHCzAPlHws+W0rB5N+er5/2pJKnfBSDiCiFAVtCLOZ7gLiMm0jhO2B6tUXHI/+M\nRPjy02i59lINMRRev56GKtcd9qO/0kUJWdZTdA2XoS82ixPvZtXQpUpuL12ab+9E\naDK8Z4RHJYYfCT3Q5vNAXaiWQ+8PTWm2QgBR/bkwSWc+NpUFgNPN9PvQi8WEg5Um\nAGMCAwEAAaNjMGEwHQYDVR0OBBYEFDZh4QB8iAUJUYtEbEf/GkzJ6k8SMB8GA1Ud\nIwQYMBaAFDZh4QB8iAUJUYtEbEf/GkzJ6k8SMA8GA1UdEwEB/wQFMAMBAf8wDgYD\nVR0PAQH/BAQDAgIEMA0GCSqGSIb3DQEBCwUAA4ICAQB8cMqTllHc8U+qCrOlg3H7\n174lmaCsbo/bJ0C17JEgMLb4kvrqsXZs01U3mB/qABg/1t5Pd5AORHARs1hhqGIC\nW/nKMav574f9rZN4PC2ZlufGXb7sIdJpGiO9ctRhiLuYuly10JccUZGEHpHSYM2G\ntkgYbZba6lsCPYAAP83cyDV+1aOkTf1RCp/lM0PKvmxYN10RYsK631jrleGdcdkx\noSK//mSQbgcWnmAEZrzHoF1/0gso1HZgIn0YLzVhLSA/iXCX4QT2h3J5z3znluKG\n1nv8NQdxei2DIIhASWfu804CA96cQKTTlaae2fweqXjdN1/v2nqOhngNyz1361mF\nmr4XmaKH/ItTwOe72NI9ZcwS1lVaCvsIkTDCEXdm9rCNPAY10iTunIHFXRh+7KPz\nlHGewCq/8TOohBRn0/NNfh7uRslOSZ/xKbN9tMBtw37Z8d2vvnXq/YWdsm1+JLVw\nn6yYD/yacNJBlwpddla8eaVMjsF6nBnIgQOf9zKSe06nSTqvgwUHosgOECZJZ1Eu\nzbH4yswbt02tKtKEFhx+v+OTge/06V+jGsqTWLsfrOCNLuA8H++z+pUENmpqnnHo\nvaI47gC+TNpkgYGkkBT6B/m/U01BuOBBTzhIlMEZq9qkDWuM2cA5kW5V3FJUcfHn\nw1IdYIg2Wxg7yHcQZemFQg==\n-----END CERTIFICATE-----"
+    },
+    {
+      "id": "google_fetched_2",
+      "label": "Google hardware attestation root certificate (fetched #2)",
+      "kind": "google_hardware",
+      "level": "trusted",
+      "pem": "-----BEGIN CERTIFICATE-----\nMIICIjCCAaigAwIBAgIRAISp0Cl7DrWK5/8OgN52BgUwCgYIKoZIzj0EAwMwUjEc\nMBoGA1UEAwwTS2V5IEF0dGVzdGF0aW9uIENBMTEQMA4GA1UECwwHQW5kcm9pZDET\nMBEGA1UECgwKR29vZ2xlIExMQzELMAkGA1UEBhMCVVMwHhcNMjUwNzE3MjIzMjE4\nWhcNMzUwNzE1MjIzMjE4WjBSMRwwGgYDVQQDDBNLZXkgQXR0ZXN0YXRpb24gQ0Ex\nMRAwDgYDVQQLDAdBbmRyb2lkMRMwEQYDVQQKDApHb29nbGUgTExDMQswCQYDVQQG\nEwJVUzB2MBAGByqGSM49AgEGBSuBBAAiA2IABCPaI3FO3z5bBQo8cuiEas4HjqCt\nG/mLFfRT0MsIssPBEEU5Cfbt6sH5yOAxqEi5QagpU1yX4HwnGb7OtBYpDTB57uH5\nEczm34A5FNijV3s0/f0UPl7zbJcTx6xwqMIRq6NCMEAwDwYDVR0TAQH/BAUwAwEB\n/zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFFIyuyz7RkOb3NaBqQ5lZuA0QepA\nMAoGCCqGSM49BAMDA2gAMGUCMETfjPO/HwqReR2CS7p0ZWoD/LHs6hDi422opifH\nEUaYLxwGlT9SLdjkVpz0UUOR5wIxAIoGyxGKRHVTpqpGRFiJtQEOOTp/+s1GcxeY\nuR2zh/80lQyu9vAFCj6E4AXc+osmRg==\n-----END CERTIFICATE-----"
     }
   ],
   "specterEntries": [
+    {
+      "id": "18957851-5042-4c2d-9cfc-eeedd6788235",
+      "source": "KOW",
+      "version": "12",
+      "serial": "774a0c73f386df0837e4730415e1e950",
+      "text": "",
+      "timestamp": "2026-10-09T10:08:35.848Z",
+      "last_checked": "2026-10-09T10:08:35.848Z",
+      "revoked": false,
+      "softbanned": false,
+      "shared": false
+    },
+    {
+      "id": "68244507-5108-41ff-b535-555f10496198",
+      "source": "KOW",
+      "version": "11",
+      "serial": "a79a5441679c1f53a92b33686fe1c0f0",
+      "text": "",
+      "timestamp": "2026-10-05T08:29:18.234Z",
+      "last_checked": "2026-10-05T08:29:18.234Z",
+      "revoked": false,
+      "softbanned": false,
+      "shared": false
+    },
+    {
+      "id": "ade3d8e5-2ccc-42ee-9d35-feddb8b8caf6",
+      "source": "KOW",
+      "version": "10",
+      "serial": "13abb4712f918d2b0c33d276e6ae1466",
+      "text": "",
+      "timestamp": "2026-10-05T08:29:10.334Z",
+      "last_checked": "2026-10-05T08:30:20.744Z",
+      "revoked": false,
+      "softbanned": false,
+      "shared": false
+    },
+    {
+      "id": "379c86ce-9576-42f2-8007-0e198a560be6",
+      "source": "KOW",
+      "version": "9",
+      "serial": "15510740886364958753",
+      "text": "",
+      "timestamp": "2026-09-28T07:26:29.565Z",
+      "last_checked": "2026-09-29T16:54:14.120Z",
+      "revoked": true,
+      "softbanned": false,
+      "shared": false
+    },
+    {
+      "id": "260813fe-02fd-4832-af6b-fad65fa9f02f",
+      "source": "KOW",
+      "version": "8",
+      "serial": "9307822e6c6f88cd2f1ab20c37afeb1",
+      "text": "",
+      "timestamp": "2026-09-28T07:18:03.252Z",
+      "last_checked": "2026-09-28T09:22:54.648Z",
+      "revoked": false,
+      "softbanned": true,
+      "shared": false
+    },
     {
       "id": "8ebab053-1a94-47ad-9379-af13c6a64b20",
       "source": "mhmrdd",
@@ -7070,8 +7160,8 @@
       "serial": "f222fd26afcfa91878bdfc6622928174",
       "text": "iloveyougoogle",
       "timestamp": "2026-09-17T10:38:18.819Z",
-      "last_checked": "2026-09-17T10:38:18.819Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:28:16.380Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7082,8 +7172,8 @@
       "serial": "fb36adb662b4f45fa124a9424a5c7fe2",
       "text": "ihateyougoogle",
       "timestamp": "2026-09-17T10:38:08.746Z",
-      "last_checked": "2026-09-17T10:38:08.746Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T22:18:30.159Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7094,8 +7184,8 @@
       "serial": "daddb10f22cc95a71c53b7d445d35ae6",
       "text": "you",
       "timestamp": "2026-09-17T10:37:31.332Z",
-      "last_checked": "2026-09-17T10:37:31.332Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T22:18:35.827Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7106,8 +7196,8 @@
       "serial": "deb0373d524677521fed39642f715f23",
       "text": "up",
       "timestamp": "2026-09-17T10:37:24.471Z",
-      "last_checked": "2026-09-17T10:37:24.471Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:28:31.165Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7118,8 +7208,8 @@
       "serial": "54ef2b03c97033504802b3d5a8a48edb",
       "text": "run",
       "timestamp": "2026-09-17T10:37:12.551Z",
-      "last_checked": "2026-09-17T10:37:12.551Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:33:06.814Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7130,8 +7220,8 @@
       "serial": "26d9e65ad4fcd021d6ccea8ceed4f5a4",
       "text": "never",
       "timestamp": "2026-09-17T10:36:58.535Z",
-      "last_checked": "2026-09-17T10:36:58.535Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:33:12.665Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7142,8 +7232,8 @@
       "serial": "fd6728114783475b4d4871e5879ede88",
       "text": "let",
       "timestamp": "2026-09-17T10:36:50.243Z",
-      "last_checked": "2026-09-17T10:36:50.243Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:37:26.087Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7154,8 +7244,8 @@
       "serial": "9905d19589efadae0eaf00b5ccbea3b5",
       "text": "gonna",
       "timestamp": "2026-09-17T10:36:42.752Z",
-      "last_checked": "2026-09-17T10:36:42.752Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:33:37.909Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7166,8 +7256,8 @@
       "serial": "790cc049b7592c3fa2f5b384b386c10f",
       "text": "give",
       "timestamp": "2026-09-17T10:36:07.570Z",
-      "last_checked": "2026-09-17T10:36:07.570Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:33:42.797Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7178,8 +7268,8 @@
       "serial": "b8c1108a259bfb669d1e4292478681e9",
       "text": "down",
       "timestamp": "2026-09-17T10:35:56.974Z",
-      "last_checked": "2026-09-17T10:35:56.974Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:33:47.932Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7190,8 +7280,8 @@
       "serial": "ccad9877532db2fe1644f8f87155e3b8",
       "text": "desert",
       "timestamp": "2026-09-17T10:35:43.533Z",
-      "last_checked": "2026-09-17T10:35:43.533Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T22:18:41.879Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7202,8 +7292,8 @@
       "serial": "a684679f8ada312e1fb513cd9e9c4df6",
       "text": "around",
       "timestamp": "2026-09-17T10:35:34.240Z",
-      "last_checked": "2026-09-17T10:35:34.240Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:33:57.264Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7214,8 +7304,8 @@
       "serial": "2d7e6125e51ac723f5cd8d89921c0540",
       "text": "and",
       "timestamp": "2026-09-17T10:35:18.365Z",
-      "last_checked": "2026-09-17T10:35:18.365Z",
-      "revoked": false,
+      "last_checked": "2026-09-28T07:34:03.010Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7226,8 +7316,8 @@
       "serial": "1698420960673666191",
       "text": "v6 (dickbox)",
       "timestamp": "2026-09-07T10:52:58.789Z",
-      "last_checked": "2026-09-16T07:01:48.461Z",
-      "revoked": false,
+      "last_checked": "2026-09-29T16:54:39.340Z",
+      "revoked": true,
       "softbanned": false,
       "shared": false
     },
@@ -7238,7 +7328,7 @@
       "serial": "64deaa4d53885472afac267bdbd4a472",
       "text": "",
       "timestamp": "2026-08-30T13:47:53.761Z",
-      "last_checked": "2026-09-16T07:01:43.635Z",
+      "last_checked": "2026-09-28T07:18:20.368Z",
       "revoked": false,
       "softbanned": true,
       "shared": false
@@ -7250,7 +7340,7 @@
       "serial": "15844101039504607786",
       "text": "",
       "timestamp": "2026-08-11T15:35:41.019Z",
-      "last_checked": "2026-08-24T07:18:03.078Z",
+      "last_checked": "2026-09-28T07:18:29.331Z",
       "revoked": true,
       "softbanned": false,
       "shared": false

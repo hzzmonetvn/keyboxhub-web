@@ -12,7 +12,7 @@ const originalCwd = process.cwd();
 const tempDir = mkdtempSync(join(tmpdir(), "keybox-notifications-"));
 const envNames = ["KEYBOX_WEBHOOK_URL", "KEYBOX_WEBHOOK_TOKEN", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"];
 const originalEnv = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
-const trustData = { roots: [], status: { entries: {} } };
+let trustData;
 let database;
 let db;
 let xml;
@@ -31,8 +31,9 @@ before(async () => {
     <CertificateChain><NumberOfCertificates>1</NumberOfCertificates>
     <Certificate format="pem">${readFileSync(join(tempDir, "cert.pem"), "utf8")}</Certificate>
     </CertificateChain></Key></Keybox></AndroidAttestation>`;
+  trustData = { roots: [{ id: "test_root", label: "Test root", kind: "google_hardware", level: "trusted", pem: readFileSync(join(tempDir, "cert.pem"), "utf8") }], status: { entries: {} } };
   analysis = await analyzeKeybox(xml, trustData);
-  assert.equal(analysis.overall, "warn");
+  assert.equal(analysis.overall, "pass");
   process.chdir(tempDir);
   database = await import("../src/db.js");
   db = database.initDb();
@@ -98,36 +99,32 @@ test("new upload/source keys notify once; duplicates and unchanged rechecks stay
   assert.ok(!JSON.stringify(body).includes("private-ip"));
 });
 
-test("new banned key emits only added with banned status", async t => {
+test("new banned key is rejected without upload notification", async t => {
   process.env.KEYBOX_WEBHOOK_URL = "https://example.test/events";
   const requests = captureRequests(t);
-  const revokedTrust = { roots: [], status: { entries: { "123456789": { status: "REVOKED" } } } };
+  const revokedTrust = { ...trustData, status: { entries: { "123456789": { status: "REVOKED" } } } };
   const revokedAnalysis = await analyzeKeybox(xml, revokedTrust);
-  database.addKeyboxSkipDuplicate(xml, revokedAnalysis);
+  const result = database.addKeyboxSkipDuplicate(xml, revokedAnalysis);
+  assert.equal(result.isBanned, true);
+  assert.equal(result.id, null);
   await database.recheckAllKeysInDb(revokedTrust);
   await nextTick();
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].body.event, "keybox.added");
-  assert.equal(requests[0].body.keybox.status, "banned");
-  assert.ok(requests[0].body.keybox.banned_at);
+  assert.equal(requests.length, 0);
 });
 
-test("revocation notifies once and recovery emits a status change", async t => {
+test("revocation notifies once and deletes keybox immediately", async t => {
   process.env.KEYBOX_WEBHOOK_URL = "https://example.test/events";
   const requests = captureRequests(t);
   database.addKeyboxSkipDuplicate(xml, analysis);
-  const revokedTrust = { roots: [], status: { entries: { "123456789": { status: "REVOKED" } } } };
+  const revokedTrust = { ...trustData, status: { entries: { "123456789": { status: "REVOKED" } } } };
   await database.recheckAllKeysInDb(revokedTrust);
   await database.recheckAllKeysInDb(revokedTrust);
-  await database.recheckAllKeysInDb(trustData);
   await nextTick();
-  assert.deepEqual(requests.map(r => r.body.event), ["keybox.added", "keybox.banned", "keybox.status_changed"]);
+  assert.deepEqual(requests.map(r => r.body.event), ["keybox.added", "keybox.banned"]);
   assert.equal(requests[1].body.previous_status, "strong");
   assert.equal(requests[1].body.keybox.status, "banned");
-  assert.equal(requests[1].body.system_status.banned_count, 1);
-  assert.equal(requests[2].body.previous_status, "banned");
-  assert.equal(requests[2].body.keybox.status, "strong");
-  assert.equal(requests[2].body.keybox.banned_at, null);
+  assert.equal(requests[1].body.system_status.total_keys, 0);
+  assert.equal(database.getAllKeyboxesPublic().length, 0);
 });
 
 test("report threshold and softban flag changes notify without repeating", async t => {

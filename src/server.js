@@ -3,6 +3,7 @@ import cors from "cors";
 import multer from "multer";
 import AdmZip from "adm-zip";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { 
   initDb, 
   addKeyboxSkipDuplicate, 
@@ -28,7 +29,7 @@ import { initNotificationSettings } from "./notification-settings.js";
 import { notificationRoutes } from "./notification-routes.js";
 
 const PORT = process.env.PORT || 8098;
-const app = express();
+export const app = express();
 
 // Configure storage for file uploads (accepts multiple files up to 20MB total)
 const upload = multer({
@@ -105,6 +106,26 @@ async function processXmlString(rawContent, filename = "keybox.xml", clientIp = 
 
     const isPass = analysis.overall === "pass" || analysis.overall === "warn";
 
+    if (!isPass || dbResult.isBanned) {
+      return {
+        filename,
+        success: false,
+        skipped: false,
+        id: null,
+        status: dbResult.status,
+        deviceId: dbResult.deviceId || "Unknown Device",
+        algorithm: dbResult.algorithm || "Unknown",
+        isNew: false,
+        reportCount: 0,
+        analysis: {
+          overall: analysis.overall,
+          warnings: analysis.warnings || [],
+          errors: analysis.errors || []
+        },
+        message: dbResult.reason || "Keybox chứa chứng chỉ đã bị Google thu hồi hoặc không hợp lệ. Hệ thống từ chối tải lên."
+      };
+    }
+
     if (dbResult.skipped) {
       return {
         filename,
@@ -127,7 +148,7 @@ async function processXmlString(rawContent, filename = "keybox.xml", clientIp = 
 
     return {
       filename,
-      success: isPass,
+      success: true,
       skipped: false,
       id: dbResult.id,
       status: dbResult.status,
@@ -140,9 +161,7 @@ async function processXmlString(rawContent, filename = "keybox.xml", clientIp = 
         warnings: analysis.warnings || [],
         errors: analysis.errors || []
       },
-      message: isPass 
-        ? "Keybox hợp lệ và đã được thêm vào hệ thống!"
-        : "Keybox chứa chứng chỉ đã bị Google thu hồi hoặc bị lỗi chuỗi (đã đánh dấu banned)."
+      message: "Keybox hợp lệ và đã được thêm vào hệ thống!"
     };
   } catch (err) {
     return {
@@ -193,8 +212,13 @@ app.post("/api/upload", upload.any(), async (req, res) => {
     const results = [];
     const files = req.files || [];
 
-    // Ensure we are using the absolute freshest Google trust data
-    const trustData = await trustManager.refreshTrustData(false);
+    // Do not accept uploads when current revocation data cannot be verified.
+    let trustData;
+    try {
+      trustData = await trustManager.refreshTrustData(false);
+    } catch {
+      return res.status(503).json({ success: false, error: "Không thể lấy dữ liệu xác thực mới nhất. Vui lòng thử lại sau." });
+    }
 
     if (files.length > 0) {
       for (const file of files) {
@@ -320,6 +344,8 @@ app.post("/api/upload", upload.any(), async (req, res) => {
         analysis: single.analysis,
         message: single.message || (single.success ? "Keybox uploaded successfully" : single.error),
         total_processed: 1,
+        newly_added: newlyAddedCount,
+        rejected_count: bannedCount,
         valid_count: validCount,
         skipped_count: skippedCount,
         results
@@ -336,6 +362,7 @@ app.post("/api/upload", upload.any(), async (req, res) => {
       strong_count: strongCount,
       device_count: deviceCount,
       banned_count: bannedCount,
+      rejected_count: bannedCount,
       results,
       message: `Đã xử lý ${totalProcessed} keybox: ${newlyAddedCount} thêm mới (${strongCount} strong, ${deviceCount} device), ${skippedCount} bỏ qua trùng lặp, ${bannedCount} không hợp lệ/thu hồi.`
     });
@@ -608,7 +635,9 @@ async function main() {
   });
 }
 
-main().catch(err => {
-  console.error("Fatal initialization error:", err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(err => {
+    console.error("Fatal initialization error:", err);
+    process.exit(1);
+  });
+}
