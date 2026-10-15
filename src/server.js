@@ -126,11 +126,37 @@ async function processXmlString(rawContent, filename = "keybox.xml", clientIp = 
       };
     }
 
+    if (dbResult.upgraded) {
+      return {
+        filename,
+        success: true,
+        skipped: false,
+        upgraded: true,
+        id: dbResult.id,
+        status: dbResult.status,
+        deviceId: dbResult.deviceId,
+        algorithm: dbResult.algorithm,
+        isNew: false,
+        isRkp: !!dbResult.isRkp,
+        qualityScore: dbResult.qualityScore,
+        reportCount: dbResult.reportCount,
+        analysis: {
+          overall: analysis.overall,
+          isRkp: !!analysis.isRkp,
+          qualityScore: analysis.qualityScore ?? 0,
+          warnings: analysis.warnings || [],
+          errors: analysis.errors || []
+        },
+        message: dbResult.reason || `Keybox đã được tự động nâng cấp lên bản chất lượng cao hơn (ID #${dbResult.id})!`
+      };
+    }
+
     if (dbResult.skipped) {
       return {
         filename,
         success: true,
         skipped: true,
+        upgraded: false,
         id: dbResult.id,
         status: dbResult.status,
         deviceId: dbResult.deviceId,
@@ -150,14 +176,19 @@ async function processXmlString(rawContent, filename = "keybox.xml", clientIp = 
       filename,
       success: true,
       skipped: false,
+      upgraded: false,
       id: dbResult.id,
       status: dbResult.status,
       deviceId: dbResult.deviceId,
       algorithm: dbResult.algorithm,
       isNew: true,
+      isRkp: !!analysis.isRkp,
+      qualityScore: analysis.qualityScore ?? 0,
       reportCount: dbResult.reportCount,
       analysis: {
         overall: analysis.overall,
+        isRkp: !!analysis.isRkp,
+        qualityScore: analysis.qualityScore ?? 0,
         warnings: analysis.warnings || [],
         errors: analysis.errors || []
       },
@@ -335,6 +366,7 @@ app.post("/api/upload", upload.any(), async (req, res) => {
       return res.status(single.success ? 200 : 422).json({
         success: single.success,
         skipped: single.skipped || false,
+        upgraded: single.upgraded || false,
         id: single.id,
         status: single.status,
         deviceId: single.deviceId,

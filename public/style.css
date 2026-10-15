@@ -960,6 +960,12 @@ textarea.input-styled {
 .data-table .btn {
   white-space: nowrap;
 }
+.table-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
 .data-table td:nth-child(2) > div > span {
   max-width: 250px;
   overflow: hidden;
@@ -1000,6 +1006,12 @@ textarea.input-styled {
   color: var(--danger);
   background: #f28c980a;
   border-color: #f28c9825;
+}
+.badge-rkp {
+  color: #38bdf8;
+  background: #38bdf814;
+  border-color: #38bdf835;
+  font-weight: 700;
 }
 .source-add-bar {
   display: flex;
@@ -1333,12 +1345,21 @@ textarea.input-styled {
   .nav-links {
     order: 3;
     width: 100%;
-    gap: 26px;
+    gap: 20px;
     height: 46px;
     margin-top: 6px;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .nav-links::-webkit-scrollbar {
+    display: none;
   }
   .nav-links a {
     font-size: 12px;
+    flex-shrink: 0;
   }
   .main-content {
     padding-top: 28px;
@@ -1385,7 +1406,7 @@ textarea.input-styled {
     grid-template-columns: minmax(0, 1fr);
   }
   #sources .data-table {
-    min-width: 740px;
+    min-width: 600px;
   }
   .footer-content {
     flex-direction: column;
@@ -1412,7 +1433,7 @@ textarea.input-styled {
   }
   .page-heading > div > p:last-child {
     font-size: 11px;
-    max-width: 240px;
+    max-width: 100%;
   }
   h1 {
     font-size: 26px;

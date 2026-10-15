@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { analyzeKeybox } from "./analyzer.js";
+import { analyzeKeybox, evaluateIsRkp, calculateKeyboxQualityScore } from "./analyzer.js";
 import { notifyKeyboxEvent } from "./notifications.js";
 
 const DB_PATH = join(process.cwd(), "data", "keybox.db");
@@ -76,6 +76,11 @@ export function initDb() {
       db.exec("ALTER TABLE keyboxes ADD COLUMN is_softbanned INTEGER DEFAULT 0;");
       console.log("[DB] Added is_softbanned column to keyboxes table");
     }
+    const hasRkp = tableInfo.some(col => col.name === "is_rkp");
+    if (!hasRkp) {
+      db.exec("ALTER TABLE keyboxes ADD COLUMN is_rkp INTEGER DEFAULT 0;");
+      console.log("[DB] Added is_rkp column to keyboxes table");
+    }
   } catch (err) {
     console.warn("[DB] Migration warning:", err.message);
   }
@@ -87,6 +92,7 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_keyboxes_device ON keyboxes(device_id);
     CREATE INDEX IF NOT EXISTS idx_keyboxes_banned_at ON keyboxes(banned_at);
     CREATE INDEX IF NOT EXISTS idx_keyboxes_softbanned ON keyboxes(is_softbanned);
+    CREATE INDEX IF NOT EXISTS idx_keyboxes_rkp ON keyboxes(is_rkp);
     CREATE INDEX IF NOT EXISTS idx_reports_key_ip ON reports(key_id, reporter_ip);
   `);
 
@@ -99,6 +105,9 @@ export function initDb() {
   insertSource.run("dare-devil-ex / keyboxxBot", "raw_url", "https://raw.githubusercontent.com/dare-devil-ex/keyboxxBot/main/keybox.xml");
   insertSource.run("FREECAMK / Play-Integrity", "raw_url", "https://raw.githubusercontent.com/FREECAMK/Keybox-Play-Integrity-/main/keybox.xml");
   insertSource.run("davidepalma.it", "raw_url", "https://www.davidepalma.it/pib/keybox.xml");
+  insertSource.run("GreyElaina / Gist", "raw_url", "https://gist.githubusercontent.com/GreyElaina/2401596f3b8a01f8602768ad5221e2fd/raw/kb_b.xml");
+  insertSource.run("zuri1503 / Toolbox-Database", "raw_url", "https://raw.githubusercontent.com/zuri1503/Toolbox-Database/main/keybox.xml");
+  insertSource.run("AnhTran1006 / Toolbox-Data", "raw_url", "https://raw.githubusercontent.com/AnhTran1006/Toolbox-Data/main/Toolbox-data/keybox.xml");
 
   const lastUpdated = getMeta("last_updated");
   if (!lastUpdated) {
@@ -220,9 +229,91 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
   const algs = Array.from(new Set(analysis.keyboxes.flatMap(k => k.keys.map(key => key.algorithm)))).join(", ") || "Unknown";
   const { serials: candidateSerials, primarySerial } = extractLeafSerials(analysis);
 
+  const isSoftbanned = !!analysis.isSoftbanned;
+  const isRkp = evaluateIsRkp(analysis);
+  const candidateScore = analysis.qualityScore ?? calculateKeyboxQualityScore(analysis);
+
+  // Helper to check and execute in-place upgrade if candidate has higher quality score
+  const tryUpgradeExisting = (existing, matchReason) => {
+    let existingScore = 0;
+    try {
+      const parsedCheck = JSON.parse(existing.check_result);
+      existingScore = parsedCheck.qualityScore ?? calculateKeyboxQualityScore(parsedCheck);
+    } catch {
+      existingScore = 0;
+    }
+
+    if (candidateScore > existingScore) {
+      // Incoming candidate is strictly better (e.g. full chain, dual EC+RSA, trusted root)
+      let upgradedStatus = existing.status;
+      // If currently banned or invalid, and new passes, evaluate fresh status
+      if (existing.status === "banned" || existing.status === "invalid") {
+        upgradedStatus = isSoftbanned ? "device" : "strong";
+      } else if (existing.status === "strong" && isSoftbanned) {
+        upgradedStatus = "device";
+      }
+
+      db.prepare(`
+        UPDATE keyboxes
+        SET xml_content = ?,
+            key_hash = ?,
+            algorithm = ?,
+            status = ?,
+            check_result = ?,
+            is_softbanned = ?,
+            is_rkp = ?,
+            serials = ?,
+            last_checked_at = ?,
+            device_id = CASE WHEN ? != '' AND ? != 'Unknown Device' THEN ? ELSE device_id END
+        WHERE id = ?
+      `).run(
+        xmlContent,
+        keyHash,
+        algs,
+        upgradedStatus,
+        JSON.stringify(analysis),
+        isSoftbanned ? 1 : 0,
+        isRkp ? 1 : 0,
+        JSON.stringify(candidateSerials),
+        now,
+        deviceId,
+        deviceId,
+        deviceId,
+        existing.id
+      );
+
+      touchLastUpdated();
+      void notifyKeyboxEvent("keybox.status_changed", getKeyboxById(existing.id), existing.status, getSystemStatus());
+
+      return {
+        id: existing.id,
+        skipped: false,
+        upgraded: true,
+        isNew: false,
+        status: upgradedStatus,
+        reportCount: existing.report_device_count,
+        deviceId: (deviceId && deviceId !== "Unknown Device") ? deviceId : existing.device_id,
+        algorithm: algs,
+        hash: keyHash,
+        source: existing.source || source,
+        isSoftbanned,
+        isRkp,
+        qualityScore: candidateScore,
+        previousScore: existingScore,
+        serials: candidateSerials,
+        primarySerial,
+        reason: `Tự động nâng cấp keybox #${existing.id} (${matchReason}) với phiên bản chất lượng cao hơn (Điểm: ${existingScore} -> ${candidateScore})`
+      };
+    }
+    return null;
+  };
+
   // Check 1: Duplicate by leaf certificate serial number
   const existingBySerial = findExistingKeyboxBySerials(candidateSerials);
   if (existingBySerial) {
+    const upgraded = tryUpgradeExisting(existingBySerial, `Trùng số serial chứng chỉ: ${candidateSerials[0] || ""}`);
+    if (upgraded) return upgraded;
+
     return {
       id: existingBySerial.id,
       skipped: true,
@@ -239,6 +330,9 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
   // Check 2: Duplicate by certificate hash
   const existingByHash = db.prepare("SELECT * FROM keyboxes WHERE key_hash = ?").get(keyHash);
   if (existingByHash) {
+    const upgraded = tryUpgradeExisting(existingByHash, "Trùng chuỗi chứng chỉ");
+    if (upgraded) return upgraded;
+
     return {
       id: existingByHash.id,
       skipped: true,
@@ -256,6 +350,9 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
   if (deviceId && deviceId.toLowerCase() !== "unknown" && deviceId.toLowerCase() !== "unknown device") {
     const existingByDevice = db.prepare("SELECT * FROM keyboxes WHERE LOWER(TRIM(device_id)) = LOWER(TRIM(?))").get(deviceId);
     if (existingByDevice) {
+      const upgraded = tryUpgradeExisting(existingByDevice, `Trùng Device ID: ${deviceId}`);
+      if (upgraded) return upgraded;
+
       return {
         id: existingByDevice.id,
         skipped: true,
@@ -270,16 +367,14 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
     }
   }
 
-  const isSoftbanned = !!analysis.isSoftbanned;
-
   // Softbanned keys can only achieve Device status, never Strong!
   let initialStatus = isSoftbanned ? "device" : "strong";
   const bannedAt = null;
 
   const insert = db.prepare(`
     INSERT INTO keyboxes (
-      key_hash, device_id, xml_content, algorithm, status, check_result, report_device_count, uploaded_at, last_checked_at, banned_at, source, created_ip, serials, is_softbanned
-    ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
+      key_hash, device_id, xml_content, algorithm, status, check_result, report_device_count, uploaded_at, last_checked_at, banned_at, source, created_ip, serials, is_softbanned, is_rkp
+    ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const info = insert.run(
@@ -295,7 +390,8 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
     source,
     ip,
     JSON.stringify(candidateSerials),
-    isSoftbanned ? 1 : 0
+    isSoftbanned ? 1 : 0,
+    isRkp ? 1 : 0
   );
 
   touchLastUpdated();
@@ -318,22 +414,52 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
 }
 
 export function getRandomValidKeybox() {
-  // STRICT PRIORITY:
-  // 1. Pick randomly among 'strong' keys if any exist
-  const strongKeys = db.prepare("SELECT id, xml_content, status, algorithm, device_id FROM keyboxes WHERE status = 'strong'").all();
-  if (strongKeys.length > 0) {
-    const picked = strongKeys[Math.floor(Math.random() * strongKeys.length)];
-    return picked;
+  // STRICT PRIORITY ORDER:
+  // Tier 1: 'strong' RKP keys (EC + Google ECDSA P-384 Root CA)
+  const strongRkpKeys = db.prepare("SELECT id, xml_content, status, algorithm, device_id, check_result FROM keyboxes WHERE status = 'strong' AND is_rkp = 1").all();
+  if (strongRkpKeys.length > 0) {
+    // Sort by qualityScore descending, pick randomly among top scores
+    return pickBestKeybox(strongRkpKeys);
   }
 
-  // 2. Otherwise pick randomly among 'device' keys if any exist
-  const deviceKeys = db.prepare("SELECT id, xml_content, status, algorithm, device_id FROM keyboxes WHERE status = 'device'").all();
+  // Tier 2: other 'strong' keys
+  const strongKeys = db.prepare("SELECT id, xml_content, status, algorithm, device_id, check_result FROM keyboxes WHERE status = 'strong'").all();
+  if (strongKeys.length > 0) {
+    return pickBestKeybox(strongKeys);
+  }
+
+  // Tier 3: 'device' RKP keys
+  const deviceRkpKeys = db.prepare("SELECT id, xml_content, status, algorithm, device_id, check_result FROM keyboxes WHERE status = 'device' AND is_rkp = 1").all();
+  if (deviceRkpKeys.length > 0) {
+    return pickBestKeybox(deviceRkpKeys);
+  }
+
+  // Tier 4: other 'device' keys
+  const deviceKeys = db.prepare("SELECT id, xml_content, status, algorithm, device_id, check_result FROM keyboxes WHERE status = 'device'").all();
   if (deviceKeys.length > 0) {
-    const picked = deviceKeys[Math.floor(Math.random() * deviceKeys.length)];
-    return picked;
+    return pickBestKeybox(deviceKeys);
   }
 
   return null;
+}
+
+function pickBestKeybox(keys) {
+  if (keys.length === 1) return keys[0];
+
+  const withScore = keys.map(k => {
+    let score = 0;
+    try {
+      const parsed = JSON.parse(k.check_result);
+      score = parsed.qualityScore ?? calculateKeyboxQualityScore(parsed);
+    } catch {
+      score = 0;
+    }
+    return { ...k, score };
+  });
+
+  const maxScore = Math.max(...withScore.map(k => k.score));
+  const topKeys = withScore.filter(k => k.score === maxScore);
+  return topKeys[Math.floor(Math.random() * topKeys.length)];
 }
 
 export function getKeyboxById(id) {
@@ -383,8 +509,8 @@ export function applyKeyboxWatermark(keybox, meta = {}) {
 
 export function getAllKeyboxesPublic() {
   const rows = db.prepare(`
-    SELECT id, key_hash, device_id, algorithm, status, report_device_count, uploaded_at, last_checked_at, banned_at, source, check_result, serials, is_softbanned
-    FROM keyboxes 
+    SELECT id, key_hash, device_id, algorithm, status, report_device_count, uploaded_at, last_checked_at, banned_at, source, check_result, serials, is_softbanned, is_rkp
+    FROM keyboxes
     ORDER BY id DESC
   `).all();
 
@@ -407,6 +533,7 @@ export function getAllKeyboxesPublic() {
       algorithm: r.algorithm,
       status: r.status,
       is_softbanned: r.is_softbanned === 1,
+      is_rkp: r.is_rkp === 1,
       serials: parsedSerials,
       primary_serial: primarySerial,
       report_count: r.report_device_count,
@@ -417,6 +544,8 @@ export function getAllKeyboxesPublic() {
       check_summary: {
         overall: parsedCheck.overall,
         isSoftbanned: !!parsedCheck.isSoftbanned,
+        isRkp: r.is_rkp === 1 || !!parsedCheck.isRkp,
+        qualityScore: parsedCheck.qualityScore ?? 0,
         specter: parsedCheck.specter || null,
         warnings: parsedCheck.warnings || [],
         errors: parsedCheck.errors || []
@@ -558,6 +687,7 @@ export async function recheckAllKeysInDb(trustData) {
       const analysis = await analyzeKeybox(k.xml_content, trustData, now);
       const isOverallPass = analysis.overall === "pass" || analysis.overall === "warn";
       const isSoftbanned = !!analysis.isSoftbanned;
+      const isRkp = evaluateIsRkp(analysis);
       const { serials } = extractLeafSerials(analysis);
       const keyHash = computeKeyboxHash(analysis);
 
@@ -588,6 +718,7 @@ export async function recheckAllKeysInDb(trustData) {
             banned_at = NULL,
             serials = ?,
             is_softbanned = ?,
+            is_rkp = ?,
             key_hash = COALESCE(?, key_hash)
         WHERE id = ?
       `).run(
@@ -596,6 +727,7 @@ export async function recheckAllKeysInDb(trustData) {
         newStatus,
         JSON.stringify(serials),
         isSoftbanned ? 1 : 0,
+        isRkp ? 1 : 0,
         keyHash,
         k.id
       );

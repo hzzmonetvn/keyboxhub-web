@@ -169,6 +169,7 @@ export async function fetchAndLootThirdPartySources(trustData) {
     looted_device_count: 0,
     skipped_duplicate_count: 0,
     rejected_invalid_count: 0,
+    upgraded_count: 0,
     details: []
   };
 
@@ -218,7 +219,22 @@ export async function fetchAndLootThirdPartySources(trustData) {
         // Key is valid (either Strong or Device)! Attempt to loot, skip if duplicate
         const dbRes = addKeyboxSkipDuplicate(cand.xml, analysis, "3rd-party-looter", cand.sourceName);
 
-        if (dbRes.skipped) {
+        if (dbRes.upgraded) {
+          results.upgraded_count++;
+          results.details.push({
+            source: cand.sourceName,
+            deviceId: dbRes.deviceId,
+            key_id: dbRes.id,
+            action: "upgraded",
+            status: dbRes.status,
+            isRkp: !!dbRes.isRkp,
+            qualityScore: dbRes.qualityScore,
+            previousScore: dbRes.previousScore,
+            isSoftbanned: !!analysis.isSoftbanned,
+            message: `Tự động nâng cấp keybox #${dbRes.id} (${dbRes.deviceId}) từ ${cand.sourceName} với bản chất lượng cao hơn (Điểm: ${dbRes.previousScore} -> ${dbRes.qualityScore})`
+          });
+          console.log(`[Looter] UPGRADED keybox #${dbRes.id} (${dbRes.deviceId}) from ${cand.sourceName}!`);
+        } else if (dbRes.skipped) {
           results.skipped_duplicate_count++;
           results.details.push({
             source: cand.sourceName,

@@ -107,6 +107,64 @@ test("valid duplicate is skipped", async () => {
   assert.equal(count(), 1);
 });
 
+test("duplicate with superior quality upgrades keybox in place", async () => {
+  // First upload: simple RSA keybox
+  const first = await (await postJson(s.base, "/api/upload", { xml: rsa.xml })).json();
+  assert.equal(first.success, true);
+  assert.equal(count(), 1);
+
+  // Second upload: keybox with identical serial 4001, but with dual EC+RSA keys (higher quality score)
+  const superiorXml = `<?xml version="1.0"?><AndroidAttestation><NumberOfKeyboxes>1</NumberOfKeyboxes>
+<Keybox DeviceID="api-rsa-upgraded">
+  <Key algorithm="rsa">
+    <PrivateKey format="pem">${rsa.keyPem}</PrivateKey>
+    <CertificateChain><NumberOfCertificates>1</NumberOfCertificates><Certificate format="pem">${rsa.certPem}</Certificate></CertificateChain>
+  </Key>
+  <Key algorithm="ecdsa">
+    <PrivateKey format="pem">${ec.keyPem}</PrivateKey>
+    <CertificateChain><NumberOfCertificates>1</NumberOfCertificates><Certificate format="pem">${ec.certPem}</Certificate></CertificateChain>
+  </Key>
+</Keybox></AndroidAttestation>`;
+
+  const secondRes = await postJson(s.base, "/api/upload", { xml: superiorXml });
+  const second = await secondRes.json();
+  assert.equal(secondRes.status, 200);
+  assert.equal(second.success, true);
+  assert.equal(second.upgraded, true);
+  assert.equal(second.skipped, false);
+  assert.equal(second.id, first.id); // Same ID kept!
+  assert.equal(count(), 1); // No duplicate row created
+
+  const row = s.db.prepare("SELECT * FROM keyboxes WHERE id = ?").get(first.id);
+  assert.equal(row.device_id, "api-rsa-upgraded");
+  assert.ok(row.xml_content.includes("api-rsa-upgraded"));
+});
+
+test("download strictly prioritises RKP keys over standard keys", async () => {
+  // Set up an RKP key: algorithm ec and root is google_p384_2026
+  const rkpTrust = {
+    roots: [
+      { id: "google_p384_2026", label: "Google Key Attestation CA1 (ECDSA P-384)", kind: "google_hardware", level: "trusted", pem: ec.certPem },
+      { id: "google_hardware_root", label: "Google Hardware Attestation Root CA", kind: "google_hardware", level: "trusted", pem: rsa.certPem }
+    ],
+    status: { entries: {} }
+  };
+  s.state.trust = rkpTrust;
+
+  // Upload standard RSA strong key and RKP EC strong key
+  await postJson(s.base, "/api/upload", { xml: rsa.xml });
+  await postJson(s.base, "/api/upload", { xml: ec.xml });
+  assert.equal(count(), 2);
+
+  // Repeated downloads should consistently pick the RKP key
+  for (let i = 0; i < 10; i++) {
+    const dl = await (await fetch(s.base + "/api/download?format=json")).json();
+    assert.equal(dl.status, "strong");
+    assert.equal(dl.deviceId, "api-ec");
+    assert.ok(dl.algorithm.includes("ec"));
+  }
+});
+
 test("URL upload uses mocked fetch only", async () => {
   s.state.urlBodies["https://example.test/keybox.xml"] = rsa.xml;
   const res = await postJson(s.base, "/api/upload", { url: "https://example.test/keybox.xml" });

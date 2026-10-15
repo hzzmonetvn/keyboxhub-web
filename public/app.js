@@ -706,7 +706,10 @@ function renderKeysTable() {
           </div>
         </td>
         ${serialCell}
-        <td><code>${escapeHTML(k.algorithm || "rsa")}</code></td>
+        <td>
+          <code>${escapeHTML(k.algorithm || "rsa")}</code>
+          ${k.is_rkp ? '<span class="badge-tag badge-rkp" style="margin-left:4px; font-size:8px; padding:2px 5px;" title="Remote Key Provisioning (RKP: EC Key & Google EC Root CA)">RKP</span>' : ''}
+        </td>
         <td>${statusBadge}</td>
         <td><small>${sourceBadge}</small></td>
         <td>
@@ -715,7 +718,7 @@ function renderKeysTable() {
         </td>
         <td><small>${formatTime(k.uploaded_at)}</small></td>
         <td>
-          <div style="display: flex; gap: 6px; align-items: center;">
+          <div class="table-actions">
             <a href="/api/download?id=${Number(k.id)}" class="btn btn-secondary btn-sm" download="keybox_${Number(k.id)}.xml" title="Download XML">
               ${t("btnDownloadRow")}
             </a>

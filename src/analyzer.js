@@ -530,7 +530,75 @@ export async function analyzeKeybox(xmlText, trustData, now = new Date()) {
     result.isSpecterRevoked = false;
   }
 
+  // Evaluate RKP and quality metrics
+  result.isRkp = evaluateIsRkp(result);
+  result.qualityScore = calculateKeyboxQualityScore(result);
+
   return result;
+}
+
+export function evaluateIsRkp(analysis) {
+  if (!analysis || !analysis.keyboxes) return false;
+  // Keybox qualifies as RKP if:
+  // 1. Has EC algorithm key/certificate
+  // 2. Terminated in Google Attestation EC root (google_p384_2026 or ECDSA P-384 / Key Attestation CA1)
+  for (const kb of analysis.keyboxes) {
+    for (const k of kb.keys || []) {
+      const isEc = (k.algorithm && /ec/i.test(k.algorithm)) ||
+                   (k.certificates && k.certificates.some(c => /ec/i.test(c.publicKeyType || "") || /ecdsa/i.test(c.signatureAlgorithm || "")));
+      const hasEcRoot = k.root && (k.root.id === "google_p384_2026" || /ecdsa|p-384|key attestation ca1/i.test(k.root.label || ""));
+      if (isEc && hasEcRoot) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function calculateKeyboxQualityScore(analysis) {
+  if (!analysis || !analysis.keyboxes) return 0;
+  let score = 0;
+
+  // Status weight
+  if (analysis.overall === "pass") score += 500;
+  else if (analysis.overall === "warn") score += 200;
+  else return 0; // failed or error
+
+  if (!analysis.isSoftbanned) score += 300;
+
+  // RKP weight (top priority)
+  if (evaluateIsRkp(analysis)) score += 1000;
+
+  let totalCerts = 0;
+  let hasValidChain = true;
+  let hasEc = false;
+  let hasRsa = false;
+
+  for (const kb of analysis.keyboxes) {
+    for (const k of kb.keys || []) {
+      if (/ec/i.test(k.algorithm || "")) hasEc = true;
+      if (/rsa/i.test(k.algorithm || "")) hasRsa = true;
+      if (k.chain?.valid === false) hasValidChain = false;
+      const certCount = k.certificates?.length || 0;
+      totalCerts += certCount;
+
+      // Bonus for full chain reaching recognized trusted root
+      if (k.root?.recognized && k.root?.level === "trusted") {
+        score += 150;
+      }
+    }
+  }
+
+  // Cert count weight: 3 or 4 certs (full chain with root) > 2 certs (missing root)
+  score += Math.min(totalCerts * 50, 400);
+
+  // Bonus for dual-key (both EC and RSA keys included in keybox)
+  if (hasEc && hasRsa) score += 200;
+  else if (hasEc) score += 100;
+
+  if (hasValidChain) score += 100;
+
+  return score;
 }
 
 export function resultToText(result) {
