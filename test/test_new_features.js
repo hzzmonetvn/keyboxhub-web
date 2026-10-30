@@ -4,6 +4,7 @@ import { setImmediate as nextTick } from "node:timers/promises";
 import AdmZip from "adm-zip";
 import { makeKeybox, trustFor, revoke } from "../test-support/fixtures.js";
 import { startServer, postJson, postFiles } from "../test-support/server.js";
+import { saveGlobalNotificationSettings } from "../src/notification-settings.js";
 
 const good = [101, 102, 103].map(n => makeKeybox({ alg: n === 102 ? "ec" : "rsa", serial: n, deviceId: `batch-${n}` }));
 const bad = makeKeybox({ serial: 199, deviceId: "batch-untrusted" });
@@ -15,7 +16,7 @@ after(() => s.close());
 beforeEach(() => {
   s.state.trust = trust;
   s.state.posted.length = 0;
-  delete process.env.KEYBOX_WEBHOOK_URL;
+  saveGlobalNotificationSettings({ webhook_enabled: false, webhook_url: "", webhook_token: "", telegram_enabled: false, telegram_bot_token: "", telegram_chat_id: "" });
   s.db.prepare("DELETE FROM reports").run();
   s.db.prepare("DELETE FROM keyboxes").run();
 });
@@ -66,7 +67,7 @@ test("batch of only rejected keys returns 422 and stores nothing", async () => {
 });
 
 test("recheck deletes newly invalid keys, reports each once, keeps valid ones", async () => {
-  process.env.KEYBOX_WEBHOOK_URL = "https://hook.test/events";
+  saveGlobalNotificationSettings({ webhook_enabled: true, webhook_url: "https://hook.test/events", webhook_token: "", telegram_enabled: false, telegram_bot_token: "", telegram_chat_id: "" });
   for (const k of good) await postJson(s.base, "/api/upload", { xml: k.xml });
   await nextTick();
   s.state.posted.length = 0;

@@ -160,14 +160,20 @@ export function standardizePrivateKey(rawPem, expectedAlg = "ecdsa") {
 export async function reorderAndCompleteChain(privateKeyPem, certificatesPem) {
   const fixes = [];
   const parsedCerts = [];
-  
-  for (const pem of certificatesPem) {
-    try {
-      const stdPem = standardizeCertPem(pem);
-      const parsed = parseCertificatePem(stdPem);
-      parsedCerts.push({ pem: stdPem, parsed });
-    } catch (e) {
-      throw new Error(`Malformed certificate: ${e.message}`);
+
+  for (const rawPem of certificatesPem) {
+    const individualCerts = rawPem.match(/-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/gi) || [rawPem];
+    if (individualCerts.length > 1) {
+      fixes.push("Tách các chứng chỉ bị dán chung thành từng thẻ Certificate riêng biệt");
+    }
+    for (const pem of individualCerts) {
+      try {
+        const stdPem = standardizeCertPem(pem);
+        const parsed = parseCertificatePem(stdPem);
+        parsedCerts.push({ pem: stdPem, parsed });
+      } catch (e) {
+        throw new Error(`Malformed certificate: ${e.message}`);
+      }
     }
   }
 
@@ -489,6 +495,11 @@ export async function repairKeybox(rawInput, trustData = null) {
       const chainResult = await reorderAndCompleteChain(privResult.pem, key.certificatesPem);
       for (const f of chainResult.fixes) {
         if (!fixesApplied.includes(f)) fixesApplied.push(f);
+      }
+
+      if (!key.hasCertificateChain) {
+        const chainFix = `Bổ sung thẻ bao bọc <CertificateChain> chuẩn AOSP cho key ${canonicalAlg}`;
+        if (!fixesApplied.includes(chainFix)) fixesApplied.push(chainFix);
       }
 
       const actualCertCount = chainResult.certs.length;

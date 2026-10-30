@@ -55,6 +55,7 @@ const translations = {
     viewDocs: "Tài liệu API",
     navSources: "Nguồn",
     navRepository: "Kho keybox",
+    adminNav: "Quản trị",
     navOverview: "Tổng quan",
     pageIntro: "Theo dõi trạng thái. Chia sẻ keybox. Kết nối cộng đồng.",
     pageTitle: "Trung tâm Keybox",
@@ -114,6 +115,8 @@ const translations = {
     inputSourceUrlPlaceholder: "Nhập link nguồn mới (VD: https://raw.githubusercontent.com/.../keybox.xml)",
     inputSourceNamePlaceholder: "Tên nguồn (tùy chọn)",
     btnAddSource: "Thêm & quét",
+    sourceAdded: "Đã gửi nguồn cộng đồng. Nguồn sẽ được quét theo lịch.",
+    sourceAddFailed: "Không thể thêm nguồn.",
     thSrcName: "Nguồn",
     thSrcType: "Loại",
     thSrcUrl: "Địa chỉ URL",
@@ -125,8 +128,8 @@ const translations = {
     apiDescDownload: "Tải ngẫu nhiên 1 file keybox.xml khả dụng (Ưu tiên Strong → Device)",
     apiDescLoot: "Kích hoạt fetch nguồn bên thứ 3 và tự động loot key Strong & Device (bỏ qua trùng)",
     apiDescUpload: "Upload đơn lẻ, nhiều file, ZIP hoặc qua link URL (Tự bỏ qua trùng lặp)",
-    apiDescStatus: "Kiểm tra trạng thái hệ thống (strong / device / banned)",
-    apiDescReport: "Báo cáo key bị hạ cấp xuống Device (trên 5 phiếu chuyển sang device)",
+    apiDescStatus: "Kiểm tra trạng thái hệ thống và danh sách metadata keybox khả dụng (tên, link tải, RKP, chứng chỉ)",
+    apiDescReport: "Báo cáo key bị hạ cấp xuống Device (Cần access token, 1 báo cáo chuyển ngay sang device)",
     footerText: "Powered by KeyBoxChecker · Kiểm tra CRL & quét nguồn mỗi giờ · Tự động xóa ngay khi bị thu hồi",
     btnCopy: "Copy",
     btnDownloadRow: "Tải",
@@ -223,6 +226,7 @@ const translations = {
     viewDocs: "API documentation",
     navSources: "Sources",
     navRepository: "Repository",
+    adminNav: "Admin",
     navOverview: "Overview",
     pageIntro: "Monitor integrity. Share keyboxes. Stay connected.",
     pageTitle: "Your keybox workspace",
@@ -282,6 +286,8 @@ const translations = {
     inputSourceUrlPlaceholder: "Enter new source link (e.g. https://raw.githubusercontent.com/.../keybox.xml)",
     inputSourceNamePlaceholder: "Source name (optional)",
     btnAddSource: "Add & scan",
+    sourceAdded: "Community source submitted. It will be scanned on schedule.",
+    sourceAddFailed: "Could not add source.",
     thSrcName: "Source",
     thSrcType: "Type",
     thSrcUrl: "URL Address",
@@ -293,8 +299,8 @@ const translations = {
     apiDescDownload: "Download a random valid keybox.xml (Strong → Device priority)",
     apiDescLoot: "Trigger 3rd-party source fetch and auto-loot Strong & Device keys (skip duplicates)",
     apiDescUpload: "Upload single, multiple files, ZIP or via direct URL link (skips duplicates)",
-    apiDescStatus: "Check system status (strong / device / banned)",
-    apiDescReport: "Report key downgraded to Device (promoted to device upon >5 votes)",
+    apiDescStatus: "Check system status and available keyboxes metadata (name, download URL, RKP, certs)",
+    apiDescReport: "Report key downgraded to Device (Requires access token, 1 report transitions immediately)",
     footerText: "Powered by KeyBoxChecker · Hourly CRL checks & source scans · Revoked keys purged immediately",
     btnCopy: "Copy",
     btnDownloadRow: "Download",
@@ -375,7 +381,7 @@ function applyLanguage(lang) {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
-  [['btn-refresh', 'navBtnRefresh'], ['btn-loot-now', 'navBtnLoot'], ['btn-loot-table', 'btnLootNowTable'], ['btn-check-now', 'btnCheckAll']].forEach(([id, key]) => {
+  [['btn-refresh', 'navBtnRefresh']].forEach(([id, key]) => {
     const el = document.getElementById(id);
     el.title = t(key);
     el.setAttribute('aria-label', t(key));
@@ -401,7 +407,6 @@ function applyLanguage(lang) {
   loadStatus();
   renderKeysTable();
   loadSources();
-  renderNotificationSubscribers();
 }
 
 function escapeHTML(v) {
@@ -460,10 +465,7 @@ const filterPills = document.querySelectorAll(".filter-pill");
 
 const btnLangToggle = document.getElementById("btn-lang-toggle");
 const btnRefresh = document.getElementById("btn-refresh");
-const btnCheckNow = document.getElementById("btn-check-now");
 const btnCopyXml = document.getElementById("btn-copy-xml");
-const btnLootNow = document.getElementById("btn-loot-now");
-const btnLootTable = document.getElementById("btn-loot-table");
 
 const dropZone = document.getElementById("drop-zone");
 const fileInput = document.getElementById("file-input");
@@ -473,9 +475,6 @@ const keyboxUrlInput = document.getElementById("keybox-url-input");
 const btnSubmitUpload = document.getElementById("btn-submit-upload");
 const uploadStatus = document.getElementById("upload-status");
 
-const inputNewSourceUrl = document.getElementById("input-new-source-url");
-const inputNewSourceName = document.getElementById("input-new-source-name");
-const btnSubmitSource = document.getElementById("btn-submit-source");
 
 const analysisResultPanel = document.getElementById("analysis-result-panel");
 const analysisResultBody = document.getElementById("analysis-result-body");
@@ -613,6 +612,36 @@ async function loadStatus() {
         ${t("downloadBtn")}${countLabel}
       `;
     }
+
+    const btnRkp = document.getElementById("btn-download-rkp");
+    if (btnRkp) {
+      if ((data.total_rkp_valid || 0) > 0) {
+        btnRkp.classList.remove("disabled");
+        btnRkp.style.pointerEvents = "auto";
+        btnRkp.style.opacity = "1";
+        btnRkp.href = "/api/download?profile=rkp";
+      } else {
+        btnRkp.classList.add("disabled");
+        btnRkp.style.pointerEvents = "none";
+        btnRkp.style.opacity = "0.5";
+        btnRkp.removeAttribute("href");
+      }
+    }
+
+    const btnHw = document.getElementById("btn-download-hw");
+    if (btnHw) {
+      if ((data.total_hw_valid || 0) > 0) {
+        btnHw.classList.remove("disabled");
+        btnHw.style.pointerEvents = "auto";
+        btnHw.style.opacity = "1";
+        btnHw.href = "/api/download?profile=hw";
+      } else {
+        btnHw.classList.add("disabled");
+        btnHw.style.pointerEvents = "none";
+        btnHw.style.opacity = "0.5";
+        btnHw.removeAttribute("href");
+      }
+    }
   } catch (err) {
     console.error("Error loading status:", err);
     systemStatusBadge.className = 'status-badge status-error';
@@ -713,8 +742,8 @@ function renderKeysTable() {
         <td>${statusBadge}</td>
         <td><small>${sourceBadge}</small></td>
         <td>
-          <span>${k.report_count} / 5</span>
-          ${k.report_count > 5 ? '<small class="text-warning"> (Device)</small>' : ''}
+          <span>${k.report_count}</span>
+          ${k.report_count >= 1 ? '<small class="text-warning"> (Device)</small>' : ''}
         </td>
         <td><small>${formatTime(k.uploaded_at)}</small></td>
         <td>
@@ -725,11 +754,6 @@ function renderKeysTable() {
             <button class="btn btn-secondary btn-sm" data-copy-xml="${Number(k.id)}" title="Copy XML to Clipboard">
               XML
             </button>
-            ${k.status === "strong" ? `
-              <button class="btn btn-danger-outline btn-sm" data-report="${Number(k.id)}" title="Report key as Device Integrity">
-                ${t("btnReportDevice")}
-              </button>
-            ` : ''}
           </div>
         </td>
       </tr>
@@ -738,11 +762,10 @@ function renderKeysTable() {
 }
 
 keysTableBody.addEventListener("click", e => {
-  const b = e.target.closest("[data-copy],[data-copy-xml],[data-report]");
-  if (!b) return;
-  if (b.dataset.copy !== undefined) copyText(b.dataset.copy);
-  else if (b.dataset.copyXml) copyKeyXml(Number(b.dataset.copyXml));
-  else reportKey(Number(b.dataset.report));
+  const b = e.target.closest("[data-copy-xml]");
+  if (b && b.dataset.copyXml) {
+    copyKeyXml(Number(b.dataset.copyXml));
+  }
 });
 
 // Fetch Key list from server
@@ -785,6 +808,35 @@ if (tableSearchInput) {
   });
 }
 
+// Submit a community source without starting an immediate scan.
+const sourceForm = document.getElementById("source-form");
+if (sourceForm) {
+  sourceForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const submit = document.getElementById("source-submit");
+    const name = document.getElementById("source-name").value.trim();
+    const url = document.getElementById("source-url").value.trim();
+    const type = document.getElementById("source-type").value;
+    submit.disabled = true;
+    try {
+      const res = await fetch("/api/sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, url, type })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t("sourceAddFailed"));
+      sourceForm.reset();
+      showToast(t("sourceAdded"), "success");
+      await loadSources();
+    } catch (err) {
+      showToast(err.message || t("connError"), "error");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
 // Fetch and render 3rd-party Sources
 async function loadSources() {
   const tbody = document.getElementById("sources-table-body");
@@ -802,15 +854,26 @@ async function loadSources() {
       return;
     }
 
-    tbody.innerHTML = sources.map(s => `
+    tbody.innerHTML = sources.map(s => {
+      let safeUrl = "";
+      try {
+        const parsedUrl = new URL(s.url);
+        if (parsedUrl.protocol === "https:" && !parsedUrl.username && !parsedUrl.password) safeUrl = parsedUrl.href;
+      } catch {}
+      const safeName = escapeHTML(s.name);
+      const safeType = escapeHTML(s.type);
+      const safeUrlText = escapeHTML(s.url);
+      const safeStatus = escapeHTML(s.last_status || "---");
+      return `
       <tr>
-        <td><strong>${s.name}</strong></td>
-        <td><code>${s.type}</code></td>
-        <td><small><a href="${s.url}" target="_blank" rel="noopener" style="color:var(--text-muted); word-break:break-all;">${s.url}</a></small></td>
-        <td><small class="${s.last_status?.includes('OK') ? 'text-success' : 'text-dim'}">${s.last_status || '---'}</small></td>
+        <td><strong>${safeName}</strong></td>
+        <td><code>${safeType}</code></td>
+        <td><small>${safeUrl ? `<a href="${escapeHTML(safeUrl)}" target="_blank" rel="noopener" style="color:var(--text-muted); word-break:break-all;">${safeUrlText}</a>` : safeUrlText}</small></td>
+        <td><small class="${s.last_status?.includes('OK') ? 'text-success' : 'text-dim'}">${safeStatus}</small></td>
         <td><small>${formatTime(s.last_fetched_at)}</small></td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
   } catch (err) {
     console.error("Could not load sources:", err);
     tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger">${t("connError")}: ${err.message}</td></tr>`;
@@ -821,9 +884,20 @@ async function loadSources() {
 window.copyText = function(text) {
   if (!text) return;
   navigator.clipboard.writeText(text)
-    .then(() => showToast(`${t("copiedIdToast")}"${text}"`, "success"))
+    .then(() => {
+      const displayTxt = text.length > 45 ? text.substring(0, 42) + "..." : text;
+      showToast(`${t("copiedIdToast")}"${displayTxt}"`, "success");
+    })
     .catch(() => showToast(currentLang === "vi" ? "Không thể sao chép văn bản" : "Failed to copy text", "error"));
 };
+
+// Global click delegation for [data-copy]
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-copy]");
+  if (b && b.dataset.copy !== undefined) {
+    copyText(b.dataset.copy);
+  }
+});
 
 // Copy XML of a specific key
 window.copyKeyXml = async function(id) {
@@ -838,53 +912,6 @@ window.copyKeyXml = async function(id) {
     showToast(`Error: ${err.message}`, "error");
   }
 };
-
-// Add new 3rd party source
-if (btnSubmitSource) {
-  btnSubmitSource.addEventListener("click", async () => {
-    const url = inputNewSourceUrl.value.trim();
-    const name = inputNewSourceName.value.trim();
-
-    if (!url) {
-      showToast(currentLang === "vi" ? "Vui lòng nhập đường link URL nguồn!" : "Please enter source URL link!", "error");
-      return;
-    }
-
-    btnSubmitSource.disabled = true;
-    btnSubmitSource.textContent = t("addingSource");
-
-    try {
-      const res = await fetch("/api/sources", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, name })
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        showToast(data.message, "success", 5000);
-        inputNewSourceUrl.value = "";
-        inputNewSourceName.value = "";
-        await loadSources();
-        await loadStatus();
-        await loadKeys();
-      } else {
-        showToast("Error: " + (data.error || "Failed to add source"), "error");
-      }
-    } catch (err) {
-      showToast(t("connError") + ": " + err.message, "error");
-    } finally {
-      btnSubmitSource.disabled = false;
-      btnSubmitSource.innerHTML = `
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-        <span>${t("btnAddSource")}</span>
-      `;
-    }
-  });
-}
 
 // Report Keybox
 window.reportKey = async function(id) {
@@ -911,57 +938,6 @@ window.reportKey = async function(id) {
     showToast(t("connError") + ": " + err.message, "error");
   }
 };
-
-// Trigger 3rd Party Loot
-async function triggerLoot() {
-  const btn = btnLootNow || btnLootTable;
-  const originalText = btn ? btn.innerHTML : "";
-  if (btnLootNow) { btnLootNow.disabled = true; btnLootNow.textContent = "..."; }
-  if (btnLootTable) { btnLootTable.disabled = true; btnLootTable.textContent = "..."; }
-
-  try {
-    const res = await fetch("/api/loot", { method: "POST" });
-    const data = await res.json();
-    if (data.success) {
-      const lr = data.lootResult;
-      const msg = currentLang === "vi"
-        ? `Hoàn tất Loot nguồn bên thứ 3! Thêm mới: ${lr.looted_count} key Strong, Bỏ qua: ${lr.skipped_duplicate_count} key trùng lặp.`
-        : `3rd-party loot cycle finished! Looted: ${lr.looted_count} new Strong keys, Skipped: ${lr.skipped_duplicate_count} duplicates.`;
-      showToast(msg, "success", 5000);
-      await loadStatus();
-      await loadKeys();
-      await loadSources();
-    } else {
-      showToast("Error: " + (data.error || "Unknown"), "error");
-    }
-  } catch (err) {
-    showToast(t("connError") + ": " + err.message, "error");
-  } finally {
-    if (btnLootNow) { 
-      btnLootNow.disabled = false; 
-      btnLootNow.innerHTML = `
-        <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </svg>
-        <span class="btn-label">${t("navBtnLoot")}</span>
-      `; 
-    }
-    if (btnLootTable) { 
-      btnLootTable.disabled = false; 
-      btnLootTable.innerHTML = `
-        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </svg>
-        <span class="btn-label">${t("btnLootNowTable")}</span>
-      `; 
-    }
-  }
-}
-
-if (btnLootNow) btnLootNow.addEventListener("click", triggerLoot);
-if (btnLootTable) btnLootTable.addEventListener("click", triggerLoot);
 
 // Copy random XML to clipboard
 btnCopyXml.addEventListener("click", async () => {
@@ -1244,33 +1220,6 @@ btnCloseResult.addEventListener("click", () => {
 });
 
 // Check Now Trigger
-btnCheckNow.addEventListener("click", async () => {
-  btnCheckNow.disabled = true;
-  btnCheckNow.textContent = t("statusChecking");
-  try {
-    const res = await fetch("/api/check-now", { method: "POST" });
-    const data = await res.json();
-    const msg = currentLang === "vi"
-      ? `Đã kiểm tra lại toàn bộ với Google! ${data.checkResult.updatedCount} key đánh giá, ${data.lootResult.looted_count} key Strong mới được loot.`
-      : `Full recheck completed with Google! ${data.checkResult.updatedCount} keys evaluated, ${data.lootResult.looted_count} new Strong keys looted.`;
-    showToast(msg, "success", 5000);
-    await loadStatus();
-    await loadKeys();
-    await loadSources();
-  } catch (err) {
-    showToast(t("connError") + ": " + err.message, "error");
-  } finally {
-    btnCheckNow.disabled = false;
-    btnCheckNow.innerHTML = `
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-      </svg>
-      <span>${t("btnCheckAll")}</span>
-    `;
-  }
-});
-
-// Refresh button
 btnRefresh.addEventListener("click", async () => {
   const icon = btnRefresh.querySelector(".refresh-icon");
   if (icon) icon.classList.add("spin-icon");
@@ -1484,235 +1433,10 @@ if (btnDownloadRepairedXml) {
   });
 }
 
-const notificationForm = document.getElementById("notification-settings-form");
-const notificationAccessInput = document.getElementById("notification-access-token");
-const notificationStatus = document.getElementById("notification-status");
-let notificationAccessToken = "";
-
-function fillNotificationSettings(config) {
-  document.getElementById("notification-webhook-enabled").checked = config.webhook_enabled;
-  document.getElementById("notification-webhook-url").value = config.webhook_url;
-  document.getElementById("notification-telegram-enabled").checked = config.telegram_enabled;
-  document.getElementById("notification-chat-id").value = config.telegram_chat_id;
-  for (const [id, saved] of [["notification-webhook-token", config.webhook_token_set], ["notification-bot-token", config.telegram_bot_token_set]]) {
-    const input = document.getElementById(id);
-    input.value = "";
-    input.placeholder = saved ? t("notificationsSecretSaved") : "";
-    if (saved) input.dataset.i18nPlaceholder = "notificationsSecretSaved";
-    else delete input.dataset.i18nPlaceholder;
-  }
-}
-
-async function notificationRequest(method, path = "", body) {
-  const buttons = document.querySelectorAll("#notification-unlock-form button, #notification-settings-form button");
-  buttons.forEach(button => { button.disabled = true; });
-  notificationStatus.textContent = t("notificationsWorking");
-  try {
-    const response = await fetch(`/api/notifications${path}`, {
-      method,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${notificationAccessToken}` },
-      body: body ? JSON.stringify(body) : undefined
-    });
-    const data = await response.json();
-    if (response.status === 401) {
-      notificationAccessToken = "";
-      notificationForm.classList.add("hidden");
-      throw new Error(t("notificationsUnauthorized"));
-    }
-    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-    return data;
-  } finally {
-    buttons.forEach(button => { button.disabled = false; });
-  }
-}
-
-document.getElementById("notification-unlock-form").addEventListener("submit", async event => {
-  event.preventDefault();
-  notificationAccessToken = notificationAccessInput.value.trim();
-  notificationAccessInput.value = "";
-  try {
-    fillNotificationSettings(await notificationRequest("GET"));
-    notificationForm.classList.remove("hidden");
-    notificationStatus.textContent = t("notificationsLoaded");
-  } catch (err) {
-    notificationStatus.textContent = err.message;
-  }
-});
-
-function readNotificationSettings() {
-  return {
-    webhook_enabled: document.getElementById("notification-webhook-enabled").checked,
-    webhook_url: document.getElementById("notification-webhook-url").value,
-    webhook_token: document.getElementById("notification-webhook-token").value,
-    telegram_enabled: document.getElementById("notification-telegram-enabled").checked,
-    telegram_bot_token: document.getElementById("notification-bot-token").value,
-    telegram_chat_id: document.getElementById("notification-chat-id").value
-  };
-}
-
-notificationForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  try {
-    const config = await notificationRequest("PUT", "", readNotificationSettings());
-    fillNotificationSettings(config);
-    notificationStatus.textContent = t("notificationsSaved");
-  } catch (err) {
-    notificationStatus.textContent = err.message;
-  }
-});
-
-document.getElementById("notification-test").addEventListener("click", async () => {
-  try {
-    if (!notificationForm.reportValidity()) return;
-    const data = await notificationRequest("POST", "/test", readNotificationSettings());
-    notificationStatus.textContent = data.results.length ? data.results.map(result =>
-      `${result.channel}: ${t(result.success ? "notificationsTestSuccess" : "notificationsTestFailed")}${result.error ? ` (${result.error})` : ""}`
-    ).join(" · ") : t("notificationsNoChannels");
-  } catch (err) {
-    notificationStatus.textContent = err.message;
-  }
-});
-
-let notificationAdminSession = "";
-let notificationSubscribers = [];
-let notificationIssuedId = "";
-const notificationAdminPanel = document.getElementById("notification-admin-panel");
-const notificationAdminStatus = document.getElementById("notification-admin-status");
-
-function clearNotificationAdmin() {
-  notificationAdminSession = "";
-  notificationSubscribers = [];
-  notificationIssuedId = "";
-  document.getElementById("notification-issued-token").value = "";
-  document.getElementById("notification-issued").classList.add("hidden");
-  notificationAdminPanel.classList.add("hidden");
-  document.getElementById("notification-admin-login").classList.remove("hidden");
-}
-
-async function notificationAdminRequest(method, path, body) {
-  const response = await fetch(`/api/notifications/admin${path}`, {
-    method,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${notificationAdminSession}` },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const data = await response.json();
-  if (response.status === 401) {
-    clearNotificationAdmin();
-    throw new Error(t("notificationsAdminUnauthorized"));
-  }
-  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-  return data;
-}
-
-function renderNotificationSubscribers() {
-  const list = document.getElementById("notification-subscriber-list");
-  list.replaceChildren();
-  if (!notificationSubscribers.length) {
-    const item = document.createElement("li");
-    item.textContent = t("notificationsNoTokens");
-    list.appendChild(item);
-  }
-  for (const subscriber of notificationSubscribers) {
-    const item = document.createElement("li");
-    const name = document.createElement("span");
-    name.textContent = subscriber.name;
-    const revoke = document.createElement("button");
-    revoke.type = "button";
-    revoke.className = "btn btn-danger-outline btn-sm";
-    revoke.textContent = t("notificationsRevoke");
-    revoke.addEventListener("click", async () => {
-      if (!window.confirm(t("notificationsRevokeConfirm"))) return;
-      revoke.disabled = true;
-      try {
-        await notificationAdminRequest("DELETE", `/subscriptions/${subscriber.id}`);
-        if (notificationIssuedId === subscriber.id) {
-          document.getElementById("notification-issued-token").value = "";
-          document.getElementById("notification-issued").classList.add("hidden");
-        }
-        await loadNotificationSubscribers();
-      } catch (err) {
-        notificationAdminStatus.textContent = err.message;
-      } finally {
-        revoke.disabled = false;
-      }
-    });
-    item.append(name, revoke);
-    list.appendChild(item);
-  }
-}
-
-async function loadNotificationSubscribers() {
-  const data = await notificationAdminRequest("GET", "/subscriptions");
-  notificationSubscribers = data.subscriptions;
-  renderNotificationSubscribers();
-}
-
-document.getElementById("notification-admin-login").addEventListener("submit", async event => {
-  event.preventDefault();
-  const passwordInput = document.getElementById("notification-admin-password");
-  const password = passwordInput.value;
-  passwordInput.value = "";
-  const button = event.currentTarget.querySelector("button");
-  button.disabled = true;
-  notificationAdminStatus.textContent = t("notificationsWorking");
-  try {
-    const data = await notificationAdminRequest("POST", "/login", { password });
-    notificationAdminSession = data.token;
-    await loadNotificationSubscribers();
-    notificationAdminPanel.classList.remove("hidden");
-    document.getElementById("notification-admin-login").classList.add("hidden");
-    notificationAdminStatus.textContent = "";
-  } catch (err) {
-    notificationAdminStatus.textContent = err.message;
-  } finally {
-    button.disabled = false;
-  }
-});
-
-document.getElementById("notification-issue-form").addEventListener("submit", async event => {
-  event.preventDefault();
-  const nameInput = document.getElementById("notification-subscriber-name");
-  const button = event.currentTarget.querySelector("button");
-  button.disabled = true;
-  try {
-    const data = await notificationAdminRequest("POST", "/subscriptions", { name: nameInput.value });
-    notificationIssuedId = data.id;
-    document.getElementById("notification-issued-token").value = data.token;
-    document.getElementById("notification-issued").classList.remove("hidden");
-    nameInput.value = "";
-    notificationAdminStatus.textContent = "";
-    await loadNotificationSubscribers();
-  } catch (err) {
-    notificationAdminStatus.textContent = err.message;
-  } finally {
-    button.disabled = false;
-  }
-});
-
-document.getElementById("notification-copy-token").addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(document.getElementById("notification-issued-token").value);
-    notificationAdminStatus.textContent = t("notificationsCopied");
-  } catch (err) {
-    notificationAdminStatus.textContent = err.message;
-  }
-});
-
-document.getElementById("notification-admin-logout").addEventListener("click", async () => {
-  try {
-    await notificationAdminRequest("POST", "/logout");
-    notificationAdminStatus.textContent = "";
-  } catch (err) {
-    notificationAdminStatus.textContent = err.message;
-  } finally {
-    clearNotificationAdmin();
-  }
-});
-
 // Initial load & Setup Language
 applyLanguage(currentLang);
 loadKeys();
-const navLinks = document.querySelectorAll('.nav-links a');
+const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
 function updateNavigation() {
   let active = '#overview';
   navLinks.forEach(link => {
@@ -1728,8 +1452,21 @@ function updateNavigation() {
 }
 window.addEventListener('scroll', updateNavigation, { passive: true });
 updateNavigation();
-setInterval(() => {
-  loadStatus();
-  loadKeys();
-  loadSources();
-}, 30000);
+let refreshTimer;
+function setRefreshInterval(seconds) {
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    loadStatus();
+    loadKeys();
+    loadSources();
+  }, seconds * 1000);
+}
+setRefreshInterval(60);
+window.addEventListener('keybox-settings', event => {
+  setRefreshInterval(event.detail.intervals.browser_seconds);
+  const cycle = document.querySelector('[data-i18n="metaCycleVal"]');
+  if (cycle) {
+    delete cycle.dataset.i18n;
+    cycle.textContent = currentLang === 'vi' ? 'Theo cấu hình quản trị' : 'Managed schedule';
+  }
+});

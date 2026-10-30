@@ -5,10 +5,11 @@ import AdmZip from "adm-zip";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { 
-  initDb, 
-  addKeyboxSkipDuplicate, 
-  getRandomValidKeybox, 
-  getKeyboxById, 
+  initDb,
+  addKeyboxSkipDuplicate,
+  getRandomValidKeybox,
+  getKeyboxById,
+  getKeyboxByFilter,
   getAllKeyboxesPublic, 
   reportKeybox, 
   getSystemStatus, 
@@ -18,18 +19,21 @@ import {
   getAllSources,
   addSource,
   toggleSource,
-  applyKeyboxWatermark
+  applyKeyboxWatermark, updateSource, deleteSource, deleteKeybox
 } from "./db.js";
 import { trustManager } from "./trust-manager.js";
 import { analyzeKeybox, decodeKeyboxBytes, parseKeyboxXml } from "./analyzer.js";
 import { repairKeybox } from "./repairer.js";
-import { startPeriodicCheck, runFullHourlyCycle } from "./cron.js";
+import { startPeriodicCheck, runFullHourlyCycle, configureIntervals } from "./cron.js";
+import { initSiteSettings, getSiteSettings, saveSiteSettings } from "./site-settings.js";
 import { fetchAndLootThirdPartySources, normaliseKeyboxBody } from "./source-fetcher.js";
-import { initNotificationSettings } from "./notification-settings.js";
+import { initNotificationSettings, getNotificationSubscriber, authorizeNotificationAdmin, getGlobalNotificationSettings, saveGlobalNotificationSettings } from "./notification-settings.js";
 import { notificationRoutes } from "./notification-routes.js";
+import { startTelegramBot, stopTelegramBot, handleTelegramUpdate, getTelegramBotToken } from "./telegram-bot.js";
 
 const PORT = process.env.PORT || 8098;
 export const app = express();
+app.set("trust proxy", "loopback");
 
 // Configure storage for file uploads (accepts multiple files up to 20MB total)
 const upload = multer({
@@ -38,11 +42,52 @@ const upload = multer({
 });
 
 // Middleware
+export function getClientIp(req) {
+  return String(req.ip || req.socket.remoteAddress || "127.0.0.1").replace(/^::ffff:/i, "");
+}
 app.use(cors());
+
+const RATE_STATE_LIMIT = 10000;
+const rateState = new Map();
+export function createRateLimiter(group, { state = rateState, capacity = RATE_STATE_LIMIT, clock = Date.now, settingsFor = () => getSiteSettings().rate_limits[group] } = {}) {
+  return (req, res, next) => {
+    const settings = settingsFor() || { max: 1, window_seconds: 60 };
+    const now = clock();
+    const key = `${group}:${getClientIp(req)}`;
+    let entry = state.get(key);
+    if (entry && entry.reset <= now) {
+      state.delete(key);
+      entry = null;
+    }
+    if (!entry) {
+      for (const [id, value] of state) if (value.reset <= now) state.delete(id);
+      if (state.size >= capacity) {
+        const earliestReset = Math.min(...Array.from(state.values(), value => value.reset));
+        res.setHeader("Retry-After", String(Math.max(1, Math.ceil((earliestReset - now) / 1000))));
+        return res.status(503).json({ error: "Rate limiter capacity reached" });
+      }
+      entry = { count: 0, reset: now + settings.window_seconds * 1000 };
+      state.set(key, entry);
+    }
+    entry.count++;
+    if (entry.count > settings.max) {
+      res.setHeader("Retry-After", String(Math.max(1, Math.ceil((entry.reset - now) / 1000))));
+      return res.status(429).json({ error: "Too many requests" });
+    }
+    next();
+  };
+}
+app.use("/api/download", createRateLimiter("download"));
+app.use(["/api/upload", "/api/repair"], createRateLimiter("upload"));
+app.use(["/api/loot", "/api/check-now", "/api/admin/loot", "/api/admin/check-now"], createRateLimiter("operations"));
+app.post("/api/sources", createRateLimiter("operations"));
+app.use("/api/notifications/admin/login", createRateLimiter("login"));
+app.use("/api/report", createRateLimiter("report"));
+app.use("/api/notifications", express.json({ limit: "16kb" }));
+app.use("/api/notifications", notificationRoutes(getSystemStatus));
 app.use(express.json({ limit: "20mb" }));
 app.use(express.text({ type: ["text/xml", "application/xml", "text/plain"], limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
-app.use("/api/notifications", notificationRoutes(getSystemStatus));
 
 // Serve static UI assets with no-cache headers to prevent browser caching stale JS/HTML
 app.use(express.static(join(process.cwd(), "public"), {
@@ -56,11 +101,6 @@ app.use(express.static(join(process.cwd(), "public"), {
     }
   }
 }));
-
-// Helper to get client IP
-function getClientIp(req) {
-  return req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket.remoteAddress || "127.0.0.1";
-}
 
 // Helper to check if a buffer is a zip file
 function isZipBuffer(buffer) {
@@ -207,13 +247,83 @@ async function processXmlString(rawContent, filename = "keybox.xml", clientIp = 
 // ==========================================
 // API ROUTES
 // ==========================================
+function requireAdmin(req, res, next) {
+  res.setHeader("Cache-Control", "no-store");
+  const token = req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7).trim() : "";
+  if (!authorizeNotificationAdmin(token)) return res.status(401).json({ error: "Admin login required" });
+  next();
+}
+
+app.get("/api/site-settings", (req, res) => {
+  const { appearance, media, intervals } = getSiteSettings();
+  res.json({ appearance, media, intervals: { browser_seconds: intervals.browser_seconds } });
+});
+app.use("/api/admin", requireAdmin);
+app.get("/api/admin/settings", (req, res) => res.json(getSiteSettings()));
+app.put("/api/admin/settings", (req, res) => {
+  try { const settings = saveSiteSettings(req.body); configureIntervals(settings.intervals); res.json(settings); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.get("/api/admin/notifications", (req, res) => { res.setHeader("Cache-Control", "no-store"); res.json(getGlobalNotificationSettings()); });
+app.put("/api/admin/notifications", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try { res.json(saveGlobalNotificationSettings(req.body)); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.get("/api/admin/keys", (req, res) => res.json({ keys: getAllKeyboxesPublic() }));
+app.delete("/api/admin/keys/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: "Invalid key ID" });
+  return deleteKeybox(id) ? res.json({ success: true }) : res.status(404).json({ error: "Key not found" });
+});
+app.get("/api/admin/sources", (req, res) => res.json({ sources: getAllSources() }));
+function isValidSourceUrl(value) {
+  if (typeof value !== "string" || value.length > 2048) return false;
+  try { const url = new URL(value); return url.protocol === "https:" && !!url.hostname && !url.username && !url.password; } catch { return false; }
+}
+
+app.post("/api/admin/sources", (req, res) => {
+  const { name, url, type } = req.body || {};
+  if (typeof name !== "string" || !name.trim() || name.trim().length > 100 || !isValidSourceUrl(url) || !["raw_url", "specter"].includes(type)) return res.status(400).json({ error: "Invalid source" });
+  try { const result = addSource(name.trim(), type, url.trim()); res.status(201).json({ success: true, id: result.lastInsertRowid }); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.put("/api/admin/sources/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const { name, url, type, enabled } = req.body || {};
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: "Invalid source ID" });
+  if (typeof name !== "string" || !name.trim() || name.trim().length > 100 || !isValidSourceUrl(url) || !["raw_url", "specter"].includes(type) || typeof enabled !== "boolean") return res.status(400).json({ error: "Invalid source" });
+  try { updateSource(id, name.trim(), url.trim(), type, enabled) ? res.json({ success: true }) : res.status(404).json({ error: "Source not found" }); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.delete("/api/admin/sources/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: "Invalid source ID" });
+  return deleteSource(id) ? res.json({ success: true }) : res.status(404).json({ error: "Source not found" });
+});
+app.post("/api/admin/check-now", async (req, res) => {
+  try { const trustData = await trustManager.refreshTrustData(true); const checkResult = await recheckAllKeysInDb(trustData); res.json({ success: true, checkResult, systemStatus: getSystemStatus() }); }
+  catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+app.post("/api/admin/loot", async (req, res) => {
+  try { const trustData = await trustManager.refreshTrustData(true); const lootResult = await fetchAndLootThirdPartySources(trustData); res.json({ success: true, lootResult, systemStatus: getSystemStatus() }); }
+  catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+app.get("/admin", (req, res) => res.sendFile(join(process.cwd(), "public", "admin.html")));
 
 /**
  * GET /api/status
  * Returns system status: strong / device / banned
  */
 app.get("/api/status", (req, res) => {
-  const status = getSystemStatus();
+  res.setHeader("Cache-Control", "public, max-age=60");
+  const host = req.get("host") || "";
+  let proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+  if (host.includes("keybox.hzzmonet.io.vn")) {
+    proto = "https";
+  }
+  const baseUrl = host ? `${proto}://${host}` : "https://keybox.hzzmonet.io.vn";
+  const status = getSystemStatus(baseUrl);
   res.json(status);
 });
 
@@ -414,10 +524,13 @@ app.post("/api/upload", upload.any(), async (req, res) => {
 app.get("/api/download", (req, res) => {
   const format = req.query.format || (req.headers.accept?.includes("application/json") ? "json" : "xml");
   const specificId = req.query.id ? parseInt(req.query.id, 10) : null;
+  const profile = req.query.profile || req.query.type || (req.query.is_rkp === "1" ? "rkp" : (req.query.is_rkp === "0" ? "hw" : null));
 
   let keybox = null;
   if (specificId && !isNaN(specificId)) {
     keybox = getKeyboxById(specificId);
+  } else if (profile) {
+    keybox = getKeyboxByFilter(profile);
   } else {
     // Strictly prioritizes 'strong' keys, fallback to 'device'
     keybox = getRandomValidKeybox();
@@ -511,9 +624,31 @@ app.post("/api/repair", upload.single("file"), async (req, res) => {
 
 /**
  * POST /api/report
- * Reports a keybox as 'device'
+ * Reports a keybox as 'device' (Requires valid subscriber token)
  */
 app.post("/api/report", (req, res) => {
+  let token = "";
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7).trim();
+  } else if (req.headers["x-access-token"]) {
+    token = String(req.headers["x-access-token"]).trim();
+  } else if (req.body?.token) {
+    token = String(req.body.token).trim();
+  } else if (req.query?.token) {
+    token = String(req.query.token).trim();
+  }
+
+  if (!token) {
+    return res.status(401).json({ success: false, error: "Access token required for reporting keybox status" });
+  }
+
+  const subscriber = getNotificationSubscriber(token);
+  const isAdmin = authorizeNotificationAdmin(token);
+  if (!subscriber && !isAdmin) {
+    return res.status(401).json({ success: false, error: "Invalid access token" });
+  }
+
   const keyId = parseInt(req.body.id || req.body.key_id || req.query.id, 10);
   if (!keyId || isNaN(keyId)) {
     return res.status(400).json({ success: false, error: "Missing valid key 'id' in request body" });
@@ -532,9 +667,9 @@ app.post("/api/report", (req, res) => {
     report_count: result.report_count,
     status: result.status,
     promoted_to_device: result.promoted_to_device,
-    message: result.promoted_to_device 
-      ? "Keybox has received more than 5 reports and has been changed to 'device' status."
-      : `Report recorded. Current reports: ${result.report_count}/5 for device status transition.`
+    message: result.promoted_to_device
+      ? "Keybox has received a report and has been changed to 'device' status."
+      : `Report recorded. Current status: ${result.status}.`
   });
 });
 
@@ -551,45 +686,13 @@ app.get("/api/keys", (req, res) => {
  * POST /api/check-now
  * Triggers full cycle with live Google attestation status & 3rd-party looting
  */
-app.post("/api/check-now", async (req, res) => {
-  try {
-    const trustData = await trustManager.refreshTrustData(true);
-    const checkResult = await recheckAllKeysInDb(trustData);
-    const lootResult = await fetchAndLootThirdPartySources(trustData);
-    const systemStatus = getSystemStatus();
-
-    res.json({
-      success: true,
-      checkResult,
-      lootResult,
-      systemStatus,
-      message: `Đã kiểm tra lại với Google & Loot nguồn thứ 3: ${checkResult.updatedCount} key được đánh giá, ${lootResult.looted_count} key mới được loot (${lootResult.looted_strong_count || 0} Strong, ${lootResult.looted_device_count || 0} Device), ${lootResult.skipped_duplicate_count} trùng lặp đã bỏ qua.`
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+app.post("/api/check-now", (req, res) => res.status(410).json({ error: "Use authenticated /api/admin/check-now" }));
 
 /**
  * POST /api/loot
  * Triggers 3rd-party source fetching & looting
  */
-app.post("/api/loot", async (req, res) => {
-  try {
-    const trustData = await trustManager.refreshTrustData(true);
-    const lootResult = await fetchAndLootThirdPartySources(trustData);
-    const systemStatus = getSystemStatus();
-
-    res.json({
-      success: true,
-      lootResult,
-      systemStatus,
-      message: `Hoàn thành loot từ nguồn thứ 3: Looted ${lootResult.looted_count} key mới (${lootResult.looted_strong_count || 0} Strong, ${lootResult.looted_device_count || 0} Device), bỏ qua ${lootResult.skipped_duplicate_count} key trùng lặp.`
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+app.post("/api/loot", (req, res) => res.status(410).json({ error: "Use authenticated /api/admin/loot" }));
 
 /**
  * GET /api/sources
@@ -604,52 +707,27 @@ app.get("/api/sources", (req, res) => {
  * POST /api/sources
  * Adds a new custom 3rd-party source and immediately scans it
  */
-app.post("/api/sources", async (req, res) => {
-  let { name, type, url } = req.body || {};
-  if (!url || typeof url !== "string" || !url.trim()) {
-    return res.status(400).json({ success: false, error: "Vui lòng nhập đường dẫn URL nguồn hợp lệ." });
-  }
-  url = url.trim();
-  if (!name || typeof name !== "string" || !name.trim()) {
-    try {
-      const u = new URL(url);
-      name = u.hostname + (u.pathname.length > 1 ? u.pathname : "");
-    } catch {
-      name = "Nguồn tùy chỉnh";
-    }
-  } else {
-    name = name.trim();
-  }
-  try {
-    addSource(name, (type || "raw_url").trim(), url);
-    // Trigger immediate loot with the new source
-    const trustData = await trustManager.refreshTrustData(true);
-    const lootResult = await fetchAndLootThirdPartySources(trustData);
-    res.json({ 
-      success: true, 
-      message: `Đã thêm nguồn "${name}" và quét thành công!`,
-      lootResult 
-    });
-  } catch (err) {
-    res.status(400).json({ 
-      success: false, 
-      error: err.message.includes("UNIQUE") ? "Nguồn URL này đã tồn tại trong danh sách." : err.message 
-    });
-  }
+app.post("/api/sources", (req, res) => {
+  const { name, url, type } = req.body || {};
+  if (typeof name !== "string" || !name.trim() || name.trim().length > 100 || !isValidSourceUrl(url) || !["raw_url", "specter"].includes(type)) return res.status(400).json({ error: "Invalid source" });
+  try { const result = addSource(name.trim(), type, url.trim()); res.status(201).json({ success: true, id: result.lastInsertRowid }); }
+  catch (err) { res.status(400).json({ error: err.message.includes("UNIQUE") ? "Source URL already exists" : err.message }); }
 });
 
 /**
- * POST /api/sources/:id/toggle
- * Enables or disables a 3rd-party source
+ * POST /api/telegram/webhook
+ * Receives incoming updates if Telegram webhook is configured
  */
-app.post("/api/sources/:id/toggle", (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const { enabled } = req.body;
+app.post("/api/telegram/webhook", async (req, res) => {
+  const token = getTelegramBotToken();
+  if (!token) {
+    return res.status(503).json({ error: "Telegram bot not configured" });
+  }
+  res.status(200).json({ ok: true });
   try {
-    toggleSource(id, enabled !== false);
-    res.json({ success: true, message: "Source updated" });
+    await handleTelegramUpdate(token, req.body);
   } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    console.error("[TelegramBot] Error processing webhook update:", err);
   }
 });
 
@@ -659,8 +737,18 @@ app.post("/api/sources/:id/toggle", (req, res) => {
 async function main() {
   initDb();
   initNotificationSettings();
+  const settings = initSiteSettings();
+  configureIntervals(settings.intervals);
   await trustManager.init();
   startPeriodicCheck();
+  startTelegramBot();
+
+  process.on("SIGTERM", () => {
+    stopTelegramBot();
+  });
+  process.on("SIGINT", () => {
+    stopTelegramBot();
+  });
 
   app.listen(PORT, "127.0.0.1", () => {
     console.log(`[Server] Keybox server listening on http://127.0.0.1:${PORT}`);

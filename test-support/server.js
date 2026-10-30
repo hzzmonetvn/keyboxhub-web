@@ -7,7 +7,12 @@ export async function startServer(trust) {
   const { app } = await import("../src/server.js");
   const database = await import("../src/db.js");
   const { trustManager } = await import("../src/trust-manager.js");
+  const siteSettings = await import("../src/site-settings.js");
   const db = database.initDb();
+  const testSettings = siteSettings.initSiteSettings();
+  for (const limit of Object.values(testSettings.rate_limits)) limit.max = 10000;
+  testSettings.rate_limits.login.max = 20;
+  siteSettings.saveSiteSettings(testSettings);
   const original = trustManager.refreshTrustData;
   const originalFetch = globalThis.fetch;
   const state = { trust, fetched: [], posted: [], urlBodies: {} };

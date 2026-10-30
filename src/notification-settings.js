@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, renameSync, chmodSync } from "
 import { join } from "node:path";
 import { randomBytes, randomUUID, createHash, scryptSync, timingSafeEqual } from "node:crypto";
 
-let store = { subscribers: [] };
+let store = { subscribers: [], global: { webhook_enabled: false, webhook_url: "", webhook_token: "", telegram_enabled: false, telegram_bot_token: "", telegram_chat_id: "" } };
 let settingsPath;
 let adminSession = null;
 
@@ -11,6 +11,9 @@ function tokenHash(token) {
 }
 
 function persist(next) {
+  if (!settingsPath) {
+    settingsPath = join(process.cwd(), "data", "notification-settings.json");
+  }
   const tempPath = `${settingsPath}.tmp`;
   writeFileSync(tempPath, JSON.stringify(next, null, 2), { mode: 0o600 });
   chmodSync(tempPath, 0o600);
@@ -21,6 +24,7 @@ function persist(next) {
 export function initNotificationSettings() {
   settingsPath = join(process.cwd(), "data", "notification-settings.json");
   store = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, "utf8")) : { subscribers: [] };
+  store.global ||= { webhook_enabled: false, webhook_url: "", webhook_token: "", telegram_enabled: false, telegram_bot_token: "", telegram_chat_id: "" };
   adminSession = null;
   if (process.env.KEYBOX_ADMIN_PASSWORD && !store.admin_password_hash) {
     setNotificationAdminPassword(process.env.KEYBOX_ADMIN_PASSWORD);
@@ -124,17 +128,37 @@ export function saveNotificationSettings(subscriber, input) {
   return publicNotificationSettings(next);
 }
 
-export function getNotificationTargets() {
-  const targets = [...store.subscribers];
-  if (process.env.KEYBOX_WEBHOOK_URL || (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID)) {
-    targets.push({
-      webhook_enabled: !!process.env.KEYBOX_WEBHOOK_URL,
-      webhook_url: process.env.KEYBOX_WEBHOOK_URL || "",
-      webhook_token: process.env.KEYBOX_WEBHOOK_TOKEN || "",
-      telegram_enabled: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
-      telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || "",
-      telegram_chat_id: process.env.TELEGRAM_CHAT_ID || ""
-    });
+export function getGlobalNotificationSettings() {
+  const config = store.global;
+  return {
+    webhook_enabled: config.webhook_enabled,
+    webhook_url: config.webhook_url,
+    webhook_token_set: !!config.webhook_token,
+    telegram_enabled: config.telegram_enabled,
+    telegram_bot_token_set: !!config.telegram_bot_token,
+    telegram_chat_id: config.telegram_chat_id
+  };
+}
+
+export function saveGlobalNotificationSettings(input) {
+  const current = store.global;
+  const merged = { ...input };
+  for (const name of ["webhook_token", "telegram_bot_token"]) {
+    if (merged[name] === "") merged[name] = current[name];
   }
-  return targets;
+  const next = validateNotificationSettings({ ...current, id: "global", name: "Shared notifications" }, {
+    webhook_enabled: merged.webhook_enabled,
+    webhook_url: merged.webhook_url,
+    webhook_token: merged.webhook_token ?? current.webhook_token,
+    telegram_enabled: merged.telegram_enabled,
+    telegram_bot_token: merged.telegram_bot_token ?? current.telegram_bot_token,
+    telegram_chat_id: merged.telegram_chat_id
+  });
+  const { id, name, ...config } = next;
+  persist({ ...store, global: config });
+  return getGlobalNotificationSettings();
+}
+
+export function getNotificationTargets() {
+  return [store.global];
 }

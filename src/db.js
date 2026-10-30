@@ -1,13 +1,16 @@
 import Database from "better-sqlite3";
 import { join } from "node:path";
+import { mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { analyzeKeybox, evaluateIsRkp, calculateKeyboxQualityScore } from "./analyzer.js";
+import { analyzeKeybox, evaluateIsRkp, calculateKeyboxQualityScore, formatCanonicalKeyboxXml } from "./analyzer.js";
 import { notifyKeyboxEvent } from "./notifications.js";
 
-const DB_PATH = join(process.cwd(), "data", "keybox.db");
 let db = null;
 
 export function initDb() {
+  const dataDir = join(process.cwd(), "data");
+  mkdirSync(dataDir, { recursive: true });
+  const DB_PATH = join(dataDir, "keybox.db");
   db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL");
@@ -81,6 +84,34 @@ export function initDb() {
       db.exec("ALTER TABLE keyboxes ADD COLUMN is_rkp INTEGER DEFAULT 0;");
       console.log("[DB] Added is_rkp column to keyboxes table");
     }
+
+    // Backfill is_rkp for existing keys if not flagged
+    try {
+      const unbackfilled = db.prepare("SELECT id, check_result FROM keyboxes WHERE is_rkp = 0 OR is_rkp IS NULL").all();
+      const updateRkp = db.prepare("UPDATE keyboxes SET is_rkp = 1 WHERE id = ?");
+      for (const row of unbackfilled) {
+        try {
+          const cr = JSON.parse(row.check_result);
+          if (evaluateIsRkp(cr)) {
+            updateRkp.run(row.id);
+          }
+        } catch {}
+      }
+    } catch {}
+
+    // Auto-canonicalize XML structure for existing keyboxes to ensure <CertificateChain> compliance
+    try {
+      const allRows = db.prepare("SELECT id, xml_content FROM keyboxes").all();
+      const updateXml = db.prepare("UPDATE keyboxes SET xml_content = ? WHERE id = ?");
+      for (const row of allRows) {
+        if (row.xml_content) {
+          const canonical = formatCanonicalKeyboxXml(row.xml_content);
+          if (canonical && canonical !== row.xml_content) {
+            updateXml.run(canonical, row.id);
+          }
+        }
+      }
+    } catch {}
   } catch (err) {
     console.warn("[DB] Migration warning:", err.message);
   }
@@ -96,8 +127,9 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_reports_key_ip ON reports(key_id, reporter_ip);
   `);
 
-  // Seed default 3rd-party sources
+  // Seed default 3rd-party sources once; later admin deletions remain deleted.
   const insertSource = db.prepare("INSERT OR IGNORE INTO sources (name, type, url, enabled) VALUES (?, ?, ?, 1)");
+  if (getMeta("default_sources_seeded") !== "1") {
   insertSource.run("Specter Catalog (KOW, Yuri, Xiaomi)", "specter", "https://rawbin.dpejoh.com/catalog");
   insertSource.run("Yurikey (Yurii0307 Official)", "raw_url", "https://raw.githubusercontent.com/Yurii0307/yurikey/main/key");
   insertSource.run("AlwaysStrong (@evokerr)", "raw_url", "https://evoker.qzz.io/key");
@@ -108,6 +140,8 @@ export function initDb() {
   insertSource.run("GreyElaina / Gist", "raw_url", "https://gist.githubusercontent.com/GreyElaina/2401596f3b8a01f8602768ad5221e2fd/raw/kb_b.xml");
   insertSource.run("zuri1503 / Toolbox-Database", "raw_url", "https://raw.githubusercontent.com/zuri1503/Toolbox-Database/main/keybox.xml");
   insertSource.run("AnhTran1006 / Toolbox-Data", "raw_url", "https://raw.githubusercontent.com/AnhTran1006/Toolbox-Data/main/Toolbox-data/keybox.xml");
+  setMeta("default_sources_seeded", "1");
+  }
 
   const lastUpdated = getMeta("last_updated");
   if (!lastUpdated) {
@@ -204,6 +238,7 @@ export function computeKeyboxHash(analysis) {
  * Adds a new keybox, but SKIPS if duplicate by leaf serial, certificate hash, or DeviceID
  */
 export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "user_upload") {
+  const canonicalXml = formatCanonicalKeyboxXml(xmlContent) || xmlContent;
   const isOverallPass = analysis.overall === "pass" || analysis.overall === "warn";
   if (!isOverallPass) {
     const isRevoked = analysis.isSpecterRevoked || analysis.keyboxes.some(kb => kb.keys.some(key => key.revocation?.hits?.length));
@@ -267,7 +302,7 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
             device_id = CASE WHEN ? != '' AND ? != 'Unknown Device' THEN ? ELSE device_id END
         WHERE id = ?
       `).run(
-        xmlContent,
+        canonicalXml,
         keyHash,
         algs,
         upgradedStatus,
@@ -380,7 +415,7 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
   const info = insert.run(
     keyHash,
     deviceId,
-    xmlContent,
+    canonicalXml,
     algs,
     initialStatus,
     JSON.stringify(analysis),
@@ -466,45 +501,84 @@ export function getKeyboxById(id) {
   return db.prepare("SELECT * FROM keyboxes WHERE id = ?").get(id);
 }
 
+export function getKeyboxByFilter(criteria) {
+  const norm = String(criteria || "").trim().toLowerCase();
+  if (!norm || norm === "none" || norm === "random") {
+    return getRandomValidKeybox();
+  }
+
+  if (norm === "rkp") {
+    const strongRkp = db.prepare("SELECT * FROM keyboxes WHERE status = 'strong' AND is_rkp = 1").all();
+    if (strongRkp.length > 0) return pickBestKeybox(strongRkp);
+    const deviceRkp = db.prepare("SELECT * FROM keyboxes WHERE status = 'device' AND is_rkp = 1").all();
+    if (deviceRkp.length > 0) return pickBestKeybox(deviceRkp);
+    return null;
+  }
+
+  if (norm === "hw") {
+    const strongHw = db.prepare("SELECT * FROM keyboxes WHERE status = 'strong' AND (is_rkp = 0 OR is_rkp IS NULL)").all();
+    if (strongHw.length > 0) return pickBestKeybox(strongHw);
+    const deviceHw = db.prepare("SELECT * FROM keyboxes WHERE status = 'device' AND (is_rkp = 0 OR is_rkp IS NULL)").all();
+    if (deviceHw.length > 0) return pickBestKeybox(deviceHw);
+    return null;
+  }
+
+  if (norm === "strong") {
+    const strongKeys = db.prepare("SELECT * FROM keyboxes WHERE status = 'strong'").all();
+    if (strongKeys.length > 0) return pickBestKeybox(strongKeys);
+    return null;
+  }
+
+  if (norm === "device") {
+    const deviceKeys = db.prepare("SELECT * FROM keyboxes WHERE status = 'device'").all();
+    if (deviceKeys.length > 0) return pickBestKeybox(deviceKeys);
+    return null;
+  }
+
+  const numericId = parseInt(norm, 10);
+  if (!isNaN(numericId) && numericId > 0) {
+    const key = getKeyboxById(numericId);
+    if (key && key.status !== "banned") return key;
+    return null;
+  }
+
+  return null;
+}
+
 /**
  * Injects a clean, prominent XML watermark indicating the keybox was aggregated and verified by Keybox Hub
+ * and ensures output is strictly canonical AOSP / Kaorios KeyBoxManager structure.
  */
 export function applyKeyboxWatermark(keybox, meta = {}) {
   const content = typeof keybox === "string" ? keybox : keybox?.xml_content;
   if (!content) return "";
 
-  let xml = content.trim();
   const id = (typeof keybox === "object" && keybox?.id) || meta.id || "N/A";
   const status = ((typeof keybox === "object" && keybox?.status) || meta.status || "VALID").toUpperCase();
   const device = (typeof keybox === "object" && keybox?.device_id) || meta.deviceId || "Standard Android Attestation";
-  const now = new Date().toISOString();
 
-  const watermarkHeader = `<!--
-================================================================================
- Keybox Hub | Play Integrity & Attestation Engine
- Tổng hợp & xác thực bởi / Aggregated & verified by: https://keybox.hzzmonet.io.vn
- Keybox ID: #${id} | Status: ${status} | Device ID: ${device}
- Exported: ${now}
-================================================================================
--->`;
+  const canonical = formatCanonicalKeyboxXml(content, {
+    watermark: true,
+    id,
+    status,
+    deviceId: device
+  });
+  return canonical || content;
+}
 
-  const watermarkFooter = `  <!-- Tổng hợp bởi Keybox Hub (https://keybox.hzzmonet.io.vn) -->\n</AndroidAttestation>`;
+export function deleteKeybox(id) {
+  return db.transaction(() => {
+    db.prepare("DELETE FROM reports WHERE key_id = ?").run(id);
+    return db.prepare("DELETE FROM keyboxes WHERE id = ?").run(id).changes > 0;
+  })();
+}
 
-  // Clean old Keybox Hub watermark if any
-  xml = xml.replace(/<!--[\s\S]*?Keybox Hub[\s\S]*?-->\s*/gi, "").trim();
+export function updateSource(id, name, url, type, enabled) {
+  return db.prepare("UPDATE sources SET name = ?, url = ?, type = ?, enabled = ? WHERE id = ?").run(name, url, type, enabled ? 1 : 0, id).changes > 0;
+}
 
-  if (xml.startsWith("<?xml")) {
-    const endTag = xml.indexOf("?>") + 2;
-    xml = xml.slice(0, endTag) + "\n" + watermarkHeader + "\n" + xml.slice(endTag).trim();
-  } else {
-    xml = watermarkHeader + "\n" + xml;
-  }
-
-  if (xml.includes("</AndroidAttestation>")) {
-    xml = xml.replace("</AndroidAttestation>", watermarkFooter);
-  }
-
-  return xml;
+export function deleteSource(id) {
+  return db.prepare("DELETE FROM sources WHERE id = ?").run(id).changes > 0;
 }
 
 export function getAllKeyboxesPublic() {
@@ -579,7 +653,7 @@ export function reportKeybox(keyId, reporterIp = "") {
   const newCount = key.report_device_count + 1;
   let newStatus = key.status;
 
-  if (newCount > 5 && key.status === "strong") {
+  if (newCount >= 1 && key.status === "strong") {
     newStatus = "device";
   }
 
@@ -594,17 +668,19 @@ export function reportKeybox(keyId, reporterIp = "") {
     key_id: keyId,
     report_count: newCount,
     status: newStatus,
-    promoted_to_device: (newCount > 5 && key.status === "strong")
+    promoted_to_device: (newCount >= 1 && key.status === "strong")
   };
 }
 
-export function getSystemStatus() {
+export function getSystemStatus(baseUrl = "https://keybox.hzzmonet.io.vn") {
   const counts = db.prepare(`
-    SELECT 
+    SELECT
       SUM(CASE WHEN status = 'strong' THEN 1 ELSE 0 END) AS strong_count,
       SUM(CASE WHEN status = 'device' THEN 1 ELSE 0 END) AS device_count,
       SUM(CASE WHEN status = 'banned' THEN 1 ELSE 0 END) AS banned_count,
       SUM(CASE WHEN is_softbanned = 1 THEN 1 ELSE 0 END) AS softbanned_count,
+      SUM(CASE WHEN status IN ('strong', 'device') AND is_rkp = 1 THEN 1 ELSE 0 END) AS rkp_valid_count,
+      SUM(CASE WHEN status IN ('strong', 'device') AND (is_rkp = 0 OR is_rkp IS NULL) THEN 1 ELSE 0 END) AS hw_valid_count,
       COUNT(*) AS total_keys
     FROM keyboxes
   `).get();
@@ -613,6 +689,8 @@ export function getSystemStatus() {
   const deviceCount = counts.device_count || 0;
   const bannedCount = counts.banned_count || 0;
   const softbannedCount = counts.softbanned_count || 0;
+  const totalRkpValid = counts.rkp_valid_count || 0;
+  const totalHwValid = counts.hw_valid_count || 0;
   const totalValid = strongCount + deviceCount;
 
   let overallStatus = "banned";
@@ -625,16 +703,88 @@ export function getSystemStatus() {
   const lastUpdated = getMeta("last_updated") || new Date().toISOString();
   const lastLooted = getMeta("last_looted_at") || null;
 
+  const validRows = db.prepare(`
+    SELECT id, key_hash, device_id, algorithm, status, report_device_count, uploaded_at, last_checked_at, source, check_result, is_softbanned, is_rkp
+    FROM keyboxes
+    WHERE status IN ('strong', 'device')
+    ORDER BY
+      CASE WHEN is_rkp = 1 THEN 0 ELSE 1 END ASC,
+      CASE WHEN status = 'strong' THEN 0 ELSE 1 END ASC,
+      id DESC
+  `).all();
+
+  const cleanBaseUrl = (baseUrl || "https://keybox.hzzmonet.io.vn").replace(/\/+$/, "");
+
+  const keyboxes = validRows.map(r => {
+    let parsedCheck = {};
+    try {
+      parsedCheck = JSON.parse(r.check_result);
+    } catch {}
+
+    let totalCerts = 0;
+    const certificateDetails = [];
+    const seenAlgorithms = new Set();
+
+    for (const kb of parsedCheck.keyboxes || []) {
+      for (const k of kb.keys || []) {
+        const alg = (k.algorithm || "").trim();
+        if (alg) seenAlgorithms.add(alg.toLowerCase());
+        const count = k.actualCertificateCount || k.certificates?.length || 0;
+        totalCerts += count;
+        certificateDetails.push({
+          algorithm: alg || "unknown",
+          count
+        });
+      }
+    }
+
+    if (seenAlgorithms.size === 0 && r.algorithm) {
+      r.algorithm
+        .split(",")
+        .map(a => a.trim())
+        .filter(Boolean)
+        .forEach(a => seenAlgorithms.add(a.toLowerCase()));
+    }
+
+    const algorithms = Array.from(seenAlgorithms);
+    const isRkp = r.is_rkp === 1 || Boolean(parsedCheck.isRkp) || evaluateIsRkp(parsedCheck);
+
+    let name = (r.device_id || "").trim();
+    if (!name || name.toLowerCase() === "unknown") {
+      name = `Keybox #${r.id} (${r.source || "user_upload"})`;
+    }
+
+    const downloadUrl = `${cleanBaseUrl}/api/download?id=${r.id}`;
+
+    return {
+      id: r.id,
+      name,
+      device_id: r.device_id,
+      status: r.status,
+      profile: isRkp ? "rkp" : "hw",
+      download_url: downloadUrl,
+      source: r.source || "user_upload",
+      uploaded_at: r.uploaded_at,
+      is_rkp: isRkp,
+      certificate_count: totalCerts,
+      algorithms,
+      certificate_details: certificateDetails
+    };
+  });
+
   return {
     status: overallStatus,
     total_valid: totalValid,
+    total_hw_valid: totalHwValid,
+    total_rkp_valid: totalRkpValid,
     strong_count: strongCount,
     device_count: deviceCount,
     banned_count: bannedCount,
     softbanned_count: softbannedCount,
     total_keys: counts.total_keys || 0,
     last_updated: lastUpdated,
-    last_looted_at: lastLooted
+    last_looted_at: lastLooted,
+    keyboxes
   };
 }
 

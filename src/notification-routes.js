@@ -1,30 +1,19 @@
 import { Router } from "express";
 import {
   loginNotificationAdmin, authorizeNotificationAdmin, logoutNotificationAdmin, getNotificationSubscriber,
-  publicNotificationSettings, saveNotificationSettings, validateNotificationSettings, listNotificationSubscribers,
+  listNotificationSubscribers,
   createNotificationSubscriber, deleteNotificationSubscriber
 } from "./notification-settings.js";
-import { sendKeyboxNotification } from "./notifications.js";
 
 export function notificationRoutes(getSystemStatus) {
   const router = Router();
-  const loginAttempts = new Map();
   router.use((req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
   });
   router.post("/admin/login", (req, res) => {
-    const now = Date.now();
-    const attempt = loginAttempts.get(req.ip);
-    if (attempt && attempt.until > now && attempt.count >= 5) {
-      return res.status(429).json({ error: "Too many login attempts. Try again in one minute." });
-    }
     const token = loginNotificationAdmin(req.body?.password);
-    if (!token) {
-      loginAttempts.set(req.ip, { count: attempt && attempt.until > now ? attempt.count + 1 : 1, until: attempt && attempt.until > now ? attempt.until : now + 60000 });
-      return res.status(401).json({ error: "Invalid admin password" });
-    }
-    loginAttempts.delete(req.ip);
+    if (!token) return res.status(401).json({ error: "Invalid admin password" });
     res.json({ token });
   });
   const bearerToken = req => req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : "";
@@ -49,32 +38,10 @@ export function notificationRoutes(getSystemStatus) {
     res.json({ success: true });
   });
   router.use((req, res, next) => {
+    if (req.path === "/" || req.path === "/test") return res.status(410).json({ error: "Subscriber notification settings are disabled" });
     req.notificationSubscriber = getNotificationSubscriber(bearerToken(req));
     if (!req.notificationSubscriber) return res.status(401).json({ error: "Invalid access token" });
     next();
-  });
-  router.get("/", (req, res) => res.json(publicNotificationSettings(req.notificationSubscriber)));
-  router.put("/", (req, res) => {
-    try {
-      res.json(saveNotificationSettings(req.notificationSubscriber, req.body));
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  });
-  router.post("/test", async (req, res) => {
-    let config = req.notificationSubscriber;
-    if (req.body && Object.keys(req.body).length > 0) {
-      try {
-        config = validateNotificationSettings(config, req.body);
-      } catch (err) {
-        return res.status(400).json({ error: err.message });
-      }
-    }
-    const results = await sendKeyboxNotification(config, "keybox.test", {
-      id: 0, device_id: "Test notification", algorithm: "test", status: "test",
-      is_softbanned: 0, source: "Keybox Hub", uploaded_at: new Date().toISOString(), banned_at: null
-    }, null, getSystemStatus());
-    res.json({ success: results.length > 0 && results.every(result => result.success), results });
   });
   return router;
 }

@@ -11,6 +11,7 @@ import { analyzeKeybox } from "../src/analyzer.js";
 const originalCwd = process.cwd();
 const tempDir = mkdtempSync(join(tmpdir(), "keybox-notifications-"));
 const envNames = ["KEYBOX_WEBHOOK_URL", "KEYBOX_WEBHOOK_TOKEN", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"];
+import { initNotificationSettings, saveGlobalNotificationSettings } from "../src/notification-settings.js";
 const originalEnv = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
 let trustData;
 let database;
@@ -35,6 +36,7 @@ before(async () => {
   analysis = await analyzeKeybox(xml, trustData);
   assert.equal(analysis.overall, "pass");
   process.chdir(tempDir);
+  initNotificationSettings();
   database = await import("../src/db.js");
   db = database.initDb();
 });
@@ -55,6 +57,20 @@ after(() => {
   }
 });
 
+function configureGlobalWebhook(url = "https://example.test/events", token = "") {
+  saveGlobalNotificationSettings({
+    webhook_enabled: true, webhook_url: url, webhook_token: token,
+    telegram_enabled: false, telegram_bot_token: "", telegram_chat_id: ""
+  });
+}
+
+function configureGlobalTelegram(token = "test-token", chatId = "123") {
+  saveGlobalNotificationSettings({
+    webhook_enabled: false, webhook_url: "", webhook_token: "",
+    telegram_enabled: true, telegram_bot_token: token, telegram_chat_id: chatId
+  });
+}
+
 function captureRequests(t) {
   const requests = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
@@ -67,14 +83,13 @@ function captureRequests(t) {
 test("disabled or incomplete configuration sends nothing", async t => {
   const requests = captureRequests(t);
   await notifyKeyboxEvent("keybox.added", {});
-  process.env.TELEGRAM_BOT_TOKEN = "test-token";
+  saveGlobalNotificationSettings({ webhook_enabled: false, webhook_url: "", webhook_token: "", telegram_enabled: false, telegram_bot_token: "", telegram_chat_id: "" });
   await notifyKeyboxEvent("keybox.added", {});
   assert.equal(requests.length, 0);
 });
 
 test("new upload/source keys notify once; duplicates and unchanged rechecks stay silent", async t => {
-  process.env.KEYBOX_WEBHOOK_URL = "https://example.test/events";
-  process.env.KEYBOX_WEBHOOK_TOKEN = "test-secret";
+  configureGlobalWebhook("https://example.test/events", "test-secret");
   const requests = captureRequests(t);
   const added = database.addKeyboxSkipDuplicate(xml, analysis, "private-ip", "test-source");
   const duplicate = database.addKeyboxSkipDuplicate(xml, analysis);
@@ -100,7 +115,7 @@ test("new upload/source keys notify once; duplicates and unchanged rechecks stay
 });
 
 test("new banned key is rejected without upload notification", async t => {
-  process.env.KEYBOX_WEBHOOK_URL = "https://example.test/events";
+  configureGlobalWebhook();
   const requests = captureRequests(t);
   const revokedTrust = { ...trustData, status: { entries: { "123456789": { status: "REVOKED" } } } };
   const revokedAnalysis = await analyzeKeybox(xml, revokedTrust);
@@ -113,7 +128,7 @@ test("new banned key is rejected without upload notification", async t => {
 });
 
 test("revocation notifies once and deletes keybox immediately", async t => {
-  process.env.KEYBOX_WEBHOOK_URL = "https://example.test/events";
+  configureGlobalWebhook();
   const requests = captureRequests(t);
   database.addKeyboxSkipDuplicate(xml, analysis);
   const revokedTrust = { ...trustData, status: { entries: { "123456789": { status: "REVOKED" } } } };
@@ -128,7 +143,7 @@ test("revocation notifies once and deletes keybox immediately", async t => {
 });
 
 test("report threshold and softban flag changes notify without repeating", async t => {
-  process.env.KEYBOX_WEBHOOK_URL = "https://example.test/events";
+  configureGlobalWebhook();
   const requests = captureRequests(t);
   const added = database.addKeyboxSkipDuplicate(xml, analysis);
   for (let i = 0; i < 7; i++) database.reportKeybox(added.id, "127.0.0.1");
@@ -149,14 +164,13 @@ test("report threshold and softban flag changes notify without repeating", async
 });
 
 test("Telegram supports chat IDs and plain text, with bounded user fields", async t => {
-  process.env.TELEGRAM_BOT_TOKEN = "test-token";
-  process.env.TELEGRAM_CHAT_ID = "-1001234567890";
+  configureGlobalTelegram("123456:test-token", "-1001234567890");
   const requests = captureRequests(t);
   await notifyKeyboxEvent("keybox.banned", {
     id: 42, status: "banned", device_id: "<device>&_*".repeat(1000), source: "source".repeat(1000), is_softbanned: 0
   }, "strong", { strong_count: 2, device_count: 1, banned_count: 1 });
   assert.equal(requests.length, 1);
-  assert.equal(requests[0].url, "https://api.telegram.org/bottest-token/sendMessage");
+  assert.equal(requests[0].url, "https://api.telegram.org/bot123456:test-token/sendMessage");
   assert.equal(requests[0].body.chat_id, "-1001234567890");
   assert.match(requests[0].body.text, /Keybox vừa bị ban/);
   assert.match(requests[0].body.text, /strong → banned/);
@@ -165,10 +179,7 @@ test("Telegram supports chat IDs and plain text, with bounded user fields", asyn
 });
 
 test("webhook errors cannot block Telegram or fail key insertion", async t => {
-  process.env.KEYBOX_WEBHOOK_URL = "https://example.test/events";
-  process.env.KEYBOX_WEBHOOK_TOKEN = "private-webhook-token";
-  process.env.TELEGRAM_BOT_TOKEN = "private-bot-token";
-  process.env.TELEGRAM_CHAT_ID = "123";
+  saveGlobalNotificationSettings({ webhook_enabled: true, webhook_url: "https://example.test/events", webhook_token: "private-webhook-token", telegram_enabled: true, telegram_bot_token: "123456:private-bot-token", telegram_chat_id: "123" });
   const warnings = [];
   const deliveries = [];
   t.mock.method(console, "warn", message => warnings.push(message));
@@ -186,9 +197,7 @@ test("webhook errors cannot block Telegram or fail key insertion", async t => {
 });
 
 test("HTTP failures and Telegram rejection are handled without leaking secrets", async t => {
-  process.env.KEYBOX_WEBHOOK_URL = "https://example.test/events";
-  process.env.TELEGRAM_BOT_TOKEN = "private-bot-token";
-  process.env.TELEGRAM_CHAT_ID = "123";
+  saveGlobalNotificationSettings({ webhook_enabled: true, webhook_url: "https://example.test/events", webhook_token: "", telegram_enabled: true, telegram_bot_token: "123456:private-bot-token", telegram_chat_id: "123" });
   const warnings = [];
   t.mock.method(console, "warn", message => warnings.push(message));
   t.mock.method(globalThis, "fetch", async url => url.includes("example.test")

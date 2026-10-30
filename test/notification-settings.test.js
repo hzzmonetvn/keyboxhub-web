@@ -4,9 +4,8 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import express from "express";
-import { initNotificationSettings, getNotificationSubscriber } from "../src/notification-settings.js";
+import { initNotificationSettings } from "../src/notification-settings.js";
 import { notificationRoutes } from "../src/notification-routes.js";
-import { notifyKeyboxEvent } from "../src/notifications.js";
 
 const originalCwd = process.cwd();
 const tempDir = mkdtempSync(join(tmpdir(), "keybox-settings-"));
@@ -17,11 +16,28 @@ const received = [];
 const status = { strong_count: 1, device_count: 0, banned_count: 0 };
 let server;
 let baseUrl;
+const loginAttempts = new Map();
 
 before(async () => {
   mkdirSync(join(tempDir, "data"));
   process.chdir(tempDir);
   const app = express();
+  app.use((req, res, next) => {
+    if (!req.path.startsWith("/api/notifications/admin/login")) return next();
+    const key = req.socket.remoteAddress;
+    const now = Date.now();
+    let item = loginAttempts.get(key);
+    if (item && item.reset <= now) { loginAttempts.delete(key); item = null; }
+    if (!item) {
+      for (const [id, value] of loginAttempts) if (value.reset <= now) loginAttempts.delete(id);
+      if (loginAttempts.size >= 10000) { res.setHeader("Retry-After", "1"); return res.status(503).json({ error: "Rate limiter capacity reached" }); }
+      item = { count: 0, reset: now + 60_000 };
+      loginAttempts.set(key, item);
+    }
+    if (item.count >= 20) { res.setHeader("Retry-After", "60"); return res.status(429).json({ error: "Too many requests" }); }
+    item.count++;
+    next();
+  });
   app.use(express.json());
   app.use("/api/notifications", notificationRoutes(() => status));
   app.post("/receiver/:name", (req, res) => {
@@ -39,6 +55,7 @@ beforeEach(() => {
   process.env.KEYBOX_ADMIN_PASSWORD = "test-admin-password";
   rmSync(join(tempDir, "data", "notification-settings.json"), { force: true });
   initNotificationSettings();
+  loginAttempts.clear();
   received.length = 0;
 });
 
@@ -80,12 +97,20 @@ function config(name, extra = {}) {
   };
 }
 
-test("anonymous and invalid tokens cannot read, change, test or issue settings", async () => {
-  for (const [method, path] of [["GET", ""], ["PUT", ""], ["POST", "/test"], ["GET", "/admin/subscriptions"], ["POST", "/admin/subscriptions"]]) {
+test("subscriber settings GET, PUT and test endpoints are disabled", async () => {
+  for (const [method, path] of [["GET", ""], ["PUT", ""], ["POST", "/test"]]) {
     const result = await request(method, path, "invalid-token", method === "GET" ? undefined : config("blocked"));
-    assert.equal(result.status, 401);
+    assert.equal(result.status, 410);
     assert.equal(result.headers.get("cache-control"), "no-store");
   }
+  assert.equal(received.length, 0);
+});
+
+test("subscriber tokens cannot authenticate as admins; admin token issuance remains available", async () => {
+  const admin = await login();
+  const subscriber = await issue(admin);
+  assert.equal((await request("GET", "/admin/subscriptions", subscriber.token)).status, 401);
+  assert.equal((await request("GET", "/admin/subscriptions", "invalid-token")).status, 401);
   assert.equal(received.length, 0);
 });
 
@@ -97,7 +122,7 @@ test("admin login hashes the password and issues tokens shown only at creation",
   assert.equal(listed.data.subscriptions.length, 1);
   assert.equal(listed.data.subscriptions[0].token, undefined);
   assert.equal(listed.data.subscriptions[0].token_hash, undefined);
-  assert.equal((await request("GET", "", admin)).status, 401);
+  assert.equal((await request("GET", "", admin)).status, 410);
   assert.equal((await request("POST", "/admin/subscriptions", subscriber.token, { name: "Forbidden" })).status, 401);
   const path = join(tempDir, "data", "notification-settings.json");
   const stored = readFileSync(path, "utf8");
@@ -107,139 +132,21 @@ test("admin login hashes the password and issues tokens shown only at creation",
   assert.equal(statSync(path).mode & 0o777, 0o600);
 });
 
-test("subscriber settings are isolated, hide secrets and preserve blank token fields", async () => {
-  const admin = await login();
-  const alice = await issue(admin, "Alice");
-  const bob = await issue(admin, "Bob");
-  const saved = await request("PUT", "", alice.token, config("alice", {
-    id: bob.id, name: "Impersonation", telegram_enabled: true,
-    telegram_bot_token: "123456:test_bot_token", telegram_chat_id: "-1001234567890"
-  }));
-  assert.equal(saved.status, 200);
-  assert.equal(saved.data.name, "Alice");
-  assert.equal(saved.data.id, alice.id);
-  assert.equal(saved.data.webhook_token_set, true);
-  assert.equal(saved.data.telegram_bot_token_set, true);
-  assert.ok(!JSON.stringify(saved.data).includes("test_bot_token"));
-  assert.ok(!JSON.stringify(saved.data).includes("secret-webhook"));
-  assert.equal((await request("GET", "", bob.token)).data.webhook_enabled, false);
-  const updated = await request("PUT", "", alice.token, config("alice", {
-    webhook_token: "", telegram_enabled: true, telegram_bot_token: "", telegram_chat_id: "@test_channel"
-  }));
-  assert.equal(updated.status, 200);
-  assert.equal(getNotificationSubscriber(alice.token).telegram_bot_token, "123456:test_bot_token");
-  assert.equal(getNotificationSubscriber(alice.token).webhook_token, "secret-webhook");
-});
-
-test("invalid URLs, incomplete Telegram credentials and non-boolean flags are rejected", async () => {
-  const subscriber = await issue(await login());
-  for (const body of [
-    config("invalid", { webhook_url: "file:///etc/passwd" }),
-    config("invalid", { webhook_url: "https://user:password@example.com" }),
-    config("invalid", { webhook_enabled: "true" }),
-    config("invalid", { webhook_url: "" }),
-    config("invalid", { telegram_enabled: true }),
-    config("invalid", { telegram_bot_token: "not-a-bot-token" }),
-    config("invalid", { telegram_chat_id: "bad chat id" }),
-    config("invalid", { webhook_token: "token\r\nHeader: value" })
-  ]) {
-    assert.equal((await request("PUT", "", subscriber.token, body)).status, 400);
-  }
-  assert.equal((await request("GET", "", subscriber.token)).data.webhook_enabled, false);
-});
-
-test("test sends only to the caller; real events fan out and revoked tokens stop receiving", async () => {
-  const admin = await login();
-  const alice = await issue(admin, "Alice");
-  const bob = await issue(admin, "Bob");
-  await request("PUT", "", alice.token, config("alice"));
-  await request("PUT", "", bob.token, config("bob"));
-  const result = await request("POST", "/test", alice.token);
-  assert.equal(result.data.success, true);
-  assert.deepEqual(received.map(item => item.name), ["alice"]);
-  assert.equal(received[0].body.event, "keybox.test");
-  assert.equal(received[0].authorization, "Bearer secret-webhook");
-  received.length = 0;
-  await notifyKeyboxEvent("keybox.added", { id: 1, device_id: "Device", status: "strong" }, null, status);
-  assert.deepEqual(received.map(item => item.name).sort(), ["alice", "bob"]);
-  assert.equal((await request("DELETE", `/admin/subscriptions/${alice.id}`, admin)).status, 200);
-  assert.equal((await request("GET", "", alice.token)).status, 401);
-  received.length = 0;
-  await notifyKeyboxEvent("keybox.banned", { id: 1, status: "banned" }, "strong", status);
-  assert.deepEqual(received.map(item => item.name), ["bob"]);
-});
-
-test("Telegram test uses the subscriber bot and reports delivery failures", async t => {
-  const subscriber = await issue(await login());
-  await request("PUT", "", subscriber.token, config("fail", {
-    telegram_enabled: true, telegram_bot_token: "123456:test_bot_token", telegram_chat_id: "-1001234567890"
-  }));
-  const messages = [];
-  t.mock.method(console, "warn", () => {});
-  t.mock.method(globalThis, "fetch", async (url, options) => {
-    if (url.startsWith("https://api.telegram.org/")) {
-      messages.push({ url, body: JSON.parse(options.body) });
-      return { ok: true, json: async () => ({ ok: true }) };
-    }
-    return originalFetch(url, options);
-  });
-  const result = await request("POST", "/test", subscriber.token);
-  assert.equal(result.data.success, false);
-  assert.deepEqual(result.data.results, [
-    { channel: "Webhook", success: false, error: "HTTP 503" },
-    { channel: "Telegram", success: true }
-  ]);
-  assert.equal(messages[0].url, "https://api.telegram.org/bot123456:test_bot_token/sendMessage");
-  assert.equal(messages[0].body.chat_id, "-1001234567890");
-  assert.match(messages[0].body.text, /Thông báo thử/);
-});
-
-test("settings and access tokens survive restart while admin sessions expire", async () => {
-  const admin = await login();
-  const subscriber = await issue(admin);
-  await request("PUT", "", subscriber.token, config("persisted"));
+test("environment notification configuration does not activate subscriber delivery", async () => {
+  process.env.KEYBOX_WEBHOOK_URL = `${baseUrl}/receiver/environment`;
+  process.env.KEYBOX_WEBHOOK_TOKEN = "environment-secret";
+  process.env.TELEGRAM_BOT_TOKEN = "123456:environment_token";
+  process.env.TELEGRAM_CHAT_ID = "-1001234567890";
   initNotificationSettings();
-  assert.equal((await request("GET", "", subscriber.token)).data.webhook_url, `${baseUrl}/receiver/persisted`);
-  assert.equal((await request("GET", "/admin/subscriptions", admin)).status, 401);
-  const newAdmin = await login();
-  assert.equal((await request("POST", "/admin/logout", newAdmin)).status, 200);
-  assert.equal((await request("GET", "/admin/subscriptions", newAdmin)).status, 401);
-});
 
-test("disabled channels send no test or real notification", async () => {
   const subscriber = await issue(await login());
-  const result = await request("POST", "/test", subscriber.token);
-  assert.equal(result.data.success, false);
-  assert.deepEqual(result.data.results, []);
-  await notifyKeyboxEvent("keybox.added", { id: 1, status: "strong" }, null, status);
-  assert.equal(received.length, 0);
-});
-
-test("connection test uses unsaved input without changing stored settings", async () => {
-  const subscriber = await issue(await login());
-  await request("PUT", "", subscriber.token, config("saved"));
-  const result = await request("POST", "/test", subscriber.token, config("draft", { webhook_token: "draft-secret" }));
-  assert.equal(result.data.success, true);
-  assert.deepEqual(received.map(item => item.name), ["draft"]);
-  assert.equal(received[0].authorization, "Bearer draft-secret");
-  const saved = await request("GET", "", subscriber.token);
-  assert.equal(saved.data.webhook_url, `${baseUrl}/receiver/saved`);
-  assert.equal(getNotificationSubscriber(subscriber.token).webhook_token, "secret-webhook");
-  await request("POST", "/test", subscriber.token, config("draft", { webhook_token: "" }));
-  assert.equal(received[1].authorization, "Bearer secret-webhook");
-});
-
-test("connection test rejects invalid drafts and cannot bypass token authentication", async () => {
-  const subscriber = await issue(await login());
-  assert.equal((await request("POST", "/test", subscriber.token, config("invalid", { webhook_url: "file:///tmp/file" }))).status, 400);
-  assert.equal((await request("POST", "/test", "invalid-token", config("blocked"))).status, 401);
-  assert.equal(received.length, 0);
-  assert.equal((await request("GET", "", subscriber.token)).data.webhook_enabled, false);
-});
-
-test("admin login rate limits repeated wrong passwords", async () => {
-  for (let i = 0; i < 5; i++) {
-    assert.equal((await request("POST", "/admin/login", "", { password: "wrong" })).status, 401);
+  for (const [method, path] of [["GET", ""], ["PUT", ""], ["POST", "/test"]]) {
+    assert.equal((await request(method, path, subscriber.token, method === "GET" ? undefined : config("blocked"))).status, 410);
   }
+  assert.equal(received.length, 0);
+});
+
+test("notification router delegates login limits to the configured parent middleware", async () => {
+  for (let i = 0; i < 20; i++) assert.equal((await request("POST", "/admin/login", "", { password: "wrong" })).status, 401);
   assert.equal((await request("POST", "/admin/login", "", { password: "wrong" })).status, 429);
 });

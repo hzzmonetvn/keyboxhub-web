@@ -1,133 +1,80 @@
-# keyboxhub-web
+# Keybox Hub
 
-## Thông báo webhook và Telegram
+Kho keybox với kiểm tra chuỗi chứng chỉ, ưu tiên RKP, sửa XML và giao diện responsive.
 
-### Cấu hình trực tiếp trên web
+## Preview
 
-Mở mục **Thông báo** trên web. Mỗi người nhận dùng token do admin cấp để nhập
-webhook URL, webhook token (tùy chọn), Telegram bot token và chat ID của riêng mình.
-Bật các kênh cần dùng, bấm **Test connection** để gửi tin thử theo các giá trị
-đang nhập, sau đó **Lưu cấu hình**. Kiểm tra kết nối không tự lưu thay đổi.
-Để trống ô token để giữ token đã lưu. Các thay đổi có hiệu lực ngay.
+Ảnh chụp giao diện với dữ liệu minh họa, không chứa thông tin đăng nhập hoặc keybox thật.
 
-Trong **Quản trị token**, admin đăng nhập bằng mật khẩu, nhập tên người nhận và
-bấm **Cấp token**. Token chỉ hiển thị lúc cấp: sao chép và gửi cho người nhận.
-**Thu hồi** sẽ xóa cấu hình người nhận, vô hiệu token và dừng các lần gửi tiếp theo.
-Người dùng chỉ xem và sửa cấu hình gắn với token của mình.
+### Desktop
+![Giao diện desktop](docs/previews/desktop.png)
 
-Cấu hình được lưu tại `data/notification-settings.json` với quyền đọc/ghi chỉ cho
-chủ file và được bỏ qua trong Git. Mật khẩu quản trị được hash bằng scrypt; token
-truy cập được lưu dạng hash. API không trả lại bot token hoặc webhook token đã lưu.
-Phiên quản trị hết hạn sau 8 giờ hoặc khi server khởi động lại; token người nhận
-và cấu hình vẫn được giữ qua lần khởi động lại. Đăng nhập sai 5 lần trong một phút
-sẽ bị giới hạn tạm thời.
+### Mobile
+<img src="docs/previews/mobile.png" alt="Giao diện mobile" width="375">
 
-Để khởi tạo mật khẩu quản trị trên một server mới, đặt `KEYBOX_ADMIN_PASSWORD`
-trong môi trường khi chạy lần đầu. Để đổi mật khẩu trên server hiện tại:
+## Chạy dự án
+
+Yêu cầu Node.js 22+.
 
 ```bash
-read -rsp 'Admin password: ' notification_password
-printf '\n'
-KEYBOX_ADMIN_PASSWORD="$notification_password" node --input-type=module -e '
-  const settings = await import("./src/notification-settings.js");
-  settings.initNotificationSettings();
-  settings.setNotificationAdminPassword(process.env.KEYBOX_ADMIN_PASSWORD);
-'
-unset notification_password
-sudo systemctl restart keybox.service
-```
-
-Các API dùng `Authorization: Bearer <token>`:
-
-| API | Quyền | Công dụng |
-| --- | --- | --- |
-| `POST /api/notifications/admin/login` | Mật khẩu | Đăng nhập với JSON `{ "password": "..." }` |
-| `GET /api/notifications/admin/subscriptions` | Admin | Danh sách người nhận |
-| `POST /api/notifications/admin/subscriptions` | Admin | Cấp token với JSON `{ "name": "..." }` |
-| `DELETE /api/notifications/admin/subscriptions/:id` | Admin | Thu hồi token |
-| `POST /api/notifications/admin/logout` | Admin | Đăng xuất |
-| `GET /api/notifications` | Người nhận | Đọc cấu hình, che token |
-| `PUT /api/notifications` | Người nhận | Lưu cấu hình của mình |
-| `POST /api/notifications/test` | Người nhận | Gửi thử cấu hình trong JSON; bỏ qua JSON để dùng cấu hình đã lưu |
-
-### Sự kiện và cấu hình bằng môi trường
-
-Thông báo được gửi khi upload hoặc tự lấy key mới từ nguồn ngoài, khi key vừa
-chuyển sang banned, và khi trạng thái Strong/Device/softban thay đổi hoặc phục hồi.
-Key trùng bị bỏ qua và kiểm tra lại không có thay đổi sẽ không gửi thông báo.
-Key mới đã banned chỉ gửi một sự kiện `keybox.added` với `status: "banned"`.
-Key bị ban được loại khỏi danh sách trên web ở lần cập nhật tiếp theo (tự động
-mỗi 30 giây). Metadata vẫn có trong API trong 24 giờ trước khi tự xóa.
-
-Sao chép `.env.example` thành `.env` và điền các kênh cần dùng:
-
-```dotenv
-KEYBOX_WEBHOOK_URL=https://example.com/keybox-events
-KEYBOX_WEBHOOK_TOKEN=your-webhook-token
-TELEGRAM_BOT_TOKEN=your-bot-token
-TELEGRAM_CHAT_ID=-1001234567890
-```
-
-- Webhook: POST JSON tới `KEYBOX_WEBHOOK_URL`. `KEYBOX_WEBHOOK_TOKEN` tùy chọn;
-  nếu đặt, request có header `Authorization: Bearer <token>`.
-- Telegram: tạo bot bằng @BotFather, đặt token và ID chat/nhóm/kênh nhận tin.
-  Chat riêng cần nhắn `/start` cho bot trước; nhóm cần thêm bot và cho phép gửi
-  tin; kênh cần cấp quyền đăng tin cho bot. Gửi qua
-  [Telegram Bot API sendMessage](https://core.telegram.org/bots/api#sendmessage).
-- Bỏ trống URL để tắt webhook; Telegram chỉ bật khi có cả token và chat ID.
-  Có thể bật cả hai kênh cùng lúc.
-
-Chạy với Node.js 22+:
-
-```bash
+npm ci
+cp .env.example .env
+# Điền KEYBOX_ADMIN_PASSWORD trong .env trên máy chủ, không commit file này.
 node --env-file=.env src/server.js
 ```
 
-Nếu dùng systemd, thêm `EnvironmentFile=/home/opc/keybox/.env` vào phần
-`[Service]` bằng `sudo systemctl edit keybox.service`, sau đó chạy
-`sudo systemctl daemon-reload` và `sudo systemctl restart keybox.service`.
-`npm start` cũng hoạt động nếu các biến đã được truyền vào môi trường tiến trình.
+Mặc định server lắng nghe tại `127.0.0.1:8098`; dùng reverse proxy để phục vụ HTTPS. Chỉ proxy loopback được tin cậy khi xác định IP. File trong `data/` được tạo khi chạy; SQLite, mật khẩu, token và cấu hình riêng không được đưa vào phiên bản hiện tại.
 
-Ví dụ payload webhook:
+## Quản trị
 
-```json
-{
-  "event_id": "9722ab1d-5c1e-4b82-90a6-383dd22e1b82",
-  "event": "keybox.banned",
-  "occurred_at": "2026-10-07T10:00:00.000Z",
-  "previous_status": "strong",
-  "keybox": {
-    "id": 42,
-    "device_id": "example-device",
-    "algorithm": "rsa",
-    "status": "banned",
-    "is_softbanned": false,
-    "source": "user_upload",
-    "uploaded_at": "2026-10-07T09:00:00.000Z",
-    "banned_at": "2026-10-07T10:00:00.000Z"
-  },
-  "system_status": {
-    "status": "strong",
-    "strong_count": 3,
-    "device_count": 1,
-    "banned_count": 2,
-    "softbanned_count": 0,
-    "total_valid": 4,
-    "total_keys": 6,
-    "last_updated": "2026-10-07T10:00:00.000Z",
-    "last_looted_at": null
-  }
-}
-```
+Mở `/admin`, đăng nhập bằng mật khẩu quản trị. Phiên bearer chỉ giữ trong bộ nhớ trang, hết hạn sau 8 giờ hoặc khi restart.
 
-Các loại sự kiện: `keybox.added`, `keybox.banned`, `keybox.status_changed`.
-Payload và tin Telegram chỉ chứa metadata, không chứa XML, private key hoặc IP
-người upload. Mỗi kênh gửi độc lập trong nền, timeout 10 giây. Lỗi gửi được ghi
-log và không làm hỏng upload/kiểm tra key. Không có hàng đợi lưu bền hoặc retry;
-thông báo có thể mất khi dịch vụ nhận lỗi hoặc tiến trình dừng trong lúc gửi.
+- Quản lý keybox, nguồn, lịch kiểm tra/quét/làm mới trình duyệt và rate limit theo IP.
+- Chọn theme, màu nhấn, độ đặc thẻ 0–100%, độ tối nền 0–100%, blur 0–100px.
+- Background desktop/mobile riêng, ảnh hoặc video, poster và nhạc nền. Nhạc cần tương tác của người xem.
+- Media hỗ trợ URL HTTPS hoặc tài nguyên trong `/images/`. Ảnh nền nằm tại [`public/images/bg.jpg`](public/images/bg.jpg), dùng đường dẫn `/images/bg.jpg`. Bản quyền hình thuộc chủ sở hữu gốc; chuyển từ ảnh nền đang dùng, không xác lập quyền sở hữu hình.
+- Lưu cấu hình Webhook/Telegram chung **không gửi tin thử**. Cấu hình gửi riêng theo token đã tắt; token cũ vẫn dùng cho xác thực API.
+- Token API được cấp và thu hồi trong quản trị, chỉ hiển thị nguyên giá trị lúc cấp.
 
-Chạy test thông báo độc lập, không dùng database đang hoạt động:
+Cấu hình riêng lưu tại `data/notification-settings.json` và `data/site-settings.json`, quyền 0600, được bỏ qua trong Git. Mật khẩu dùng scrypt, token truy cập lưu dạng hash. Giữ kín file cấu hình vì thông tin kênh gửi cần được lưu để sử dụng.
+
+### Nguồn cộng đồng
+
+Người xem có thể thêm nguồn HTTPS ngay trên trang chủ, **không cần đăng nhập**. Thêm nguồn không quét ngay; giới hạn theo IP áp dụng để giảm lạm dụng. Sửa, xóa, bật/tắt và quét thủ công vẫn yêu cầu quản trị.
+
+### API chính
+
+| API | Quyền | Công dụng |
+| --- | --- | --- |
+| `GET /api/status` | Công khai | Trạng thái và metadata keybox |
+| `GET /api/download?profile=rkp` | Công khai | Tải theo profile; hỗ trợ `hw`, `id` |
+| `POST /api/upload`, `/api/repair` | Công khai, giới hạn IP | Kiểm tra/tải lên và sửa XML |
+| `GET/POST /api/sources` | Công khai, POST giới hạn IP | Danh sách/thêm nguồn |
+| `GET /api/site-settings` | Công khai | Giao diện/media và chu kỳ trình duyệt |
+| `POST /api/notifications/admin/login` | Mật khẩu | Tạo phiên quản trị |
+| `GET/PUT /api/admin/settings` | Admin | Cấu hình website |
+| `GET/PUT /api/admin/notifications` | Admin | Kênh thông báo chung, che secret |
+| `/api/admin/keys`, `/api/admin/sources` | Admin | Quản lý keybox/nguồn |
+| `POST /api/admin/check-now`, `/api/admin/loot` | Admin | Kiểm tra/quét thủ công |
+| `/api/notifications/admin/subscriptions` | Admin | Cấp/danh sách/thu hồi token API |
+| `POST /api/report` | Token API hoặc admin | Báo trạng thái keybox |
+
+API bảo vệ dùng `Authorization: Bearer <token>`. Các endpoint cấu hình/thử thông báo của subscriber cũ trả về `410`.
+
+## Thông báo và bot
+
+Thông báo chung được cấu hình trong `/admin`; không tự lấy đích gửi từ môi trường hay subscriber cũ. Sự kiện gồm `keybox.added`, `keybox.banned`, `keybox.status_changed`. Payload thông báo chỉ chứa metadata, không chứa XML, private key hoặc IP. Gửi nền có timeout; không có hàng đợi lưu bền hoặc retry.
+
+Bot Telegram tải keybox là module riêng: ưu tiên `TELEGRAM_BOT_TOKEN` trong môi trường, sau đó token bot của subscriber cũ nếu có. Bot hỗ trợ `/status`, `/list`, `/keybox`, `/help`. Long polling có thể khởi động cùng dịch vụ nếu đã cấu hình token; không bật trên môi trường kiểm thử với thông tin thật.
+
+## Kiểm thử
 
 ```bash
-node --test test/notifications.test.js test/notification-settings.test.js
+npm test
 ```
+
+Không chạy test với thông tin kênh gửi production. API test dùng dữ liệu tạm và giả lập mạng; kiểm tra phạm vi cô lập của các test khác trước khi chạy trên máy chủ đang phục vụ.
+
+## Dữ liệu đã được theo dõi trước đây
+
+SQLite/WAL và trust cache được bỏ khỏi phiên bản hiện tại nhưng vẫn có thể tồn tại trong lịch sử Git cũ. Không xem thao tác ignore/untrack là xóa lịch sử hoặc thu hồi thông tin đã công khai. File runtime trên máy chủ không bị xóa.

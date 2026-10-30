@@ -82,14 +82,32 @@ export function parseKeyboxXml(xmlText) {
     let keyMatch;
     while ((keyMatch = keyRe.exec(body))) {
       const [, keyAttrs, keyBody] = keyMatch;
-      const chain = firstText(keyBody, "CertificateChain") || keyBody;
+      const chainMatch = keyBody.match(/<CertificateChain\b[^>]*>([\s\S]*?)<\/CertificateChain>/i);
+      const chain = chainMatch ? chainMatch[1] : keyBody;
+      const hasCertificateChain = !!chainMatch;
       const certs = [];
       const certRe = /<Certificate\b[^>]*format\s*=\s*(["'])pem\1[^>]*>([\s\S]*?)<\/Certificate>/gi;
       let certMatch;
-      while ((certMatch = certRe.exec(chain))) certs.push(decodeEntities(certMatch[2].trim()));
+      while ((certMatch = certRe.exec(chain))) {
+        const rawCert = decodeEntities(certMatch[2].trim());
+        // Split if multiple certificates are pasted in one <Certificate> tag
+        const individualCerts = rawCert.match(/-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/gi);
+        if (individualCerts && individualCerts.length > 0) {
+          for (const c of individualCerts) certs.push(c.trim());
+        } else if (rawCert) {
+          certs.push(rawCert);
+        }
+      }
+      if (certs.length === 0) {
+        const looseCerts = chain.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi);
+        if (looseCerts) {
+          for (const lc of looseCerts) certs.push(lc.trim());
+        }
+      }
       keys.push({
         algorithm: attr(keyAttrs, "algorithm") || "Unknown",
         privateKeyPem: firstText(keyBody, "PrivateKey") || "",
+        hasCertificateChain,
         declaredCertificateCount: Number.parseInt(firstText(chain, "NumberOfCertificates") || `${certs.length}`, 10),
         certificatesPem: certs,
       });
@@ -625,4 +643,105 @@ export function resultToText(result) {
     }
   }
   return lines.join("\n");
+}
+
+function cleanPem(pem) {
+  if (!pem) return "";
+  return pem
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * Canonicalizes keybox XML to strictly adhere to the AOSP / Kaorios KeyBoxManager standard:
+ * 1. Root <AndroidAttestation> with <NumberOfKeyboxes>
+ * 2. <Keybox DeviceID="...">
+ * 3. Inside each <Key algorithm="...">:
+ *    - <PrivateKey format="pem">
+ *    - <CertificateChain> wrapping all certificates
+ *    - <NumberOfCertificates> with accurate count
+ *    - Each certificate separated into its own <Certificate format="pem"> tag
+ */
+export function formatCanonicalKeyboxXml(xmlTextOrParsed, options = {}) {
+  let parsed;
+  if (typeof xmlTextOrParsed === "string") {
+    const unwatermarked = xmlTextOrParsed
+      .replace(/<!--[\s\S]*?Keybox Hub[\s\S]*?-->\s*/gi, "")
+      .replace(/<!--[\s\S]*?fetched from[\s\S]*?-->\s*/gi, "")
+      .trim();
+    parsed = parseKeyboxXml(unwatermarked);
+  } else if (xmlTextOrParsed && Array.isArray(xmlTextOrParsed.keyboxes)) {
+    parsed = xmlTextOrParsed;
+  } else {
+    return "";
+  }
+
+  if (!parsed.keyboxes || parsed.keyboxes.length === 0) {
+    return typeof xmlTextOrParsed === "string" ? xmlTextOrParsed : "";
+  }
+
+  const keyboxCount = parsed.keyboxes.length;
+  let out = `<?xml version="1.0"?>\n`;
+
+  if (options.watermark) {
+    const id = options.id || "N/A";
+    const status = (options.status || "VALID").toUpperCase();
+    const rawDev = options.deviceId || (parsed.keyboxes[0]?.deviceId) || "Standard Android Attestation";
+    const device = String(rawDev).replace(/--/g, "- -").replace(/>/g, "&gt;");
+    const now = options.now || new Date().toISOString();
+    out += `<!--
+================================================================================
+ Keybox Hub | Play Integrity & Attestation Engine
+ Tổng hợp & xác thực bởi / Aggregated & verified by: https://keybox.hzzmonet.io.vn
+ Keybox ID: #${id} | Status: ${status} | Device ID: ${device}
+ Exported: ${now}
+ Modules Supported: TrickyStore, PlayIntegrityFork, APatch, KernelSU, Magisk
+================================================================================
+-->\n`;
+  }
+
+  out += `<AndroidAttestation>\n`;
+  out += `    <NumberOfKeyboxes>${keyboxCount}</NumberOfKeyboxes>\n`;
+
+  for (const kb of parsed.keyboxes) {
+    const devId = (kb.deviceId || "Standard-Android-Device")
+      .replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    out += `    <Keybox DeviceID="${devId}">\n`;
+
+    for (const key of kb.keys || []) {
+      const rawAlg = (key.algorithm || "ecdsa").toLowerCase();
+      const alg = (rawAlg === "ec" || rawAlg === "ecdsa") ? "ecdsa" : (rawAlg === "rsa" ? "rsa" : rawAlg);
+      out += `        <Key algorithm="${alg}">\n`;
+      out += `            <PrivateKey format="pem">\n`;
+      const cleanPriv = cleanPem(key.privateKeyPem);
+      if (cleanPriv) {
+        out += `${cleanPriv}\n`;
+      }
+      out += `            </PrivateKey>\n`;
+      out += `            <CertificateChain>\n`;
+      const certs = key.certificatesPem || [];
+      out += `                <NumberOfCertificates>${certs.length}</NumberOfCertificates>\n`;
+      for (const cert of certs) {
+        const cleanCert = cleanPem(cert);
+        if (cleanCert) {
+          out += `                <Certificate format="pem">\n`;
+          out += `${cleanCert}\n`;
+          out += `                </Certificate>\n`;
+        }
+      }
+      out += `            </CertificateChain>\n`;
+      out += `        </Key>\n`;
+    }
+
+    out += `    </Keybox>\n`;
+  }
+
+  if (options.watermark) {
+    out += `  <!-- Tổng hợp bởi Keybox Hub (https://keybox.hzzmonet.io.vn) -->\n`;
+  }
+  out += `</AndroidAttestation>`;
+
+  return out;
 }

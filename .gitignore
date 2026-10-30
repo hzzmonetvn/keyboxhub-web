@@ -3,3 +3,10 @@
 !.env.example
 data/notification-settings.json
 data/notification-settings.json.tmp
+data/site-settings.json
+data/site-settings.json.tmp
+data/*.db
+data/*.db-*
+data/trust-data.json
+node_modules/
+keybox-architecture.html
