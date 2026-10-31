@@ -10,3 +10,5 @@ data/*.db-*
 data/trust-data.json
 node_modules/
 keybox-architecture.html
+public/sw.js
+public/ads.js
