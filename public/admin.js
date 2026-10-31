@@ -26,9 +26,9 @@
     const sections = { appearance: { mode: a.mode, accent: a.accent, card_opacity: Number(a.card_opacity), background_dim: Number(a.background_dim), card_blur: Number(a.card_blur) }, media: { ...m, music_volume: Number(m.music_volume) }, intervals: Object.fromEntries(Object.entries(i).map(([k,v])=>[k,Number(v)])), rate_limits };
     for (const key of ['desktop_url','desktop_poster','mobile_url','mobile_poster','music_url']) {
       const value = sections.media[key];
-      if (!value || (/^\/images\/[a-zA-Z0-9_./-]+$/.test(value) && !value.split('/').includes('..'))) continue;
+      if (!value || (/^\/(images|media)\/[a-zA-Z0-9_./-]+$/.test(value) && !value.split('/').includes('..'))) continue;
       const url = new URL(value);
-      if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Dùng HTTPS hoặc đường dẫn /images/ trong repo.');
+      if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Dùng HTTPS hoặc đường dẫn /images/, /media/ trong repo.');
     }
     return sections;
   }

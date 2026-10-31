@@ -26,7 +26,8 @@ process.chdir(dir);
   assert.equal(validateSiteSettings({ ...defaults, appearance: legacyAppearance }).appearance.card_blur, 24);
   assert.throws(() => validateSiteSettings({ ...defaults, media: { ...defaults.media, desktop_url: "http://example.com/bg.png" } }));
   assert.equal(validateSiteSettings({ ...defaults, media: { ...defaults.media, desktop_url: "/images/bg.jpg" } }).media.desktop_url, "/images/bg.jpg");
-  for (const desktop_url of ['//example.com/bg.jpg', '/images/../data/site-settings.json', '/data/site-settings.json']) {
+  assert.equal(validateSiteSettings({ ...defaults, media: { ...defaults.media, desktop_url: "/media/bg.mp4" } }).media.desktop_url, "/media/bg.mp4");
+  for (const desktop_url of ['//example.com/bg.jpg', '/images/../data/site-settings.json', '/media/../data/site-settings.json', '/data/site-settings.json']) {
     assert.throws(() => validateSiteSettings({ ...defaults, media: { ...defaults.media, desktop_url } }));
   }
   assert.throws(() => validateSiteSettings({ ...defaults, appearance: { ...defaults.appearance, accent: 123 } }));

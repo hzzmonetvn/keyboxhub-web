@@ -199,3 +199,18 @@
 - **Verification**:
   - Full test suite passed (54/54).
   - Service restarted (`systemctl restart keybox`); verified clean looter cycle completing in 7 seconds with zero 404/502 errors and 2 active valid keyboxes intact.
+
+## 19. PC Video Background and Audio Separation (2026-10-31)
+- **Chosen**:
+  - Download high-definition video from X (tweet 2116367064436998250).
+  - Split into a muted progressive H.264 MP4 video (`public/media/bg.mp4`), a 192kbps stereo MP3 audio track (`public/media/bg.mp3`), and a video poster frame (`public/media/bg-poster.jpg`).
+  - Extend `mediaUrl()` validation in `src/site-settings.js` and `public/admin.js` to allow `/media/` paths in addition to `/images/` with path-traversal prevention.
+  - Update `public/admin.html` input types from `type="url"` to `type="text"` to allow submitting repo-relative media paths without browser validation conflicts.
+  - Configure desktop interface in `data/site-settings.json` to use `desktop_url: "/media/bg.mp4"`, `desktop_type: "video"`, `desktop_poster: "/media/bg-poster.jpg"`, and `music_url: "/media/bg.mp3"`.
+- **Considered & Rejected**:
+  - Keeping audio inside the background video file: rejected because modern browsers block or throttle autoplay for video elements with audio tracks. Stripping audio allows flawless muted background video autoplay while preserving audio for user-controlled background music.
+  - Relying on external CDN/streaming URLs: rejected in favor of self-hosting the media assets directly inside `public/media/` for zero third-party latency, offline resilience, and guaranteed byte-range support.
+- **Verification**:
+  - Test suite passed 54/54 tests, including new unit test assertions for `/media/` path validation and directory traversal prevention.
+  - Service restarted (`systemctl restart keybox.service`); verified HTTP 200 OK, `video/mp4`, `audio/mpeg`, and `image/jpeg` byte-range headers on port 8098.
+

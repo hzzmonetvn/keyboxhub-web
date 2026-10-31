@@ -20,7 +20,7 @@ function isPlainObject(value) {
 function mediaUrl(value) {
   if (typeof value !== "string" || value.length > 2048) return false;
   if (!value) return true;
-  if (/^\/images\/[a-zA-Z0-9_./-]+$/.test(value) && !value.split('/').includes('..')) return true;
+  if (/^\/(images|media)\/[a-zA-Z0-9_./-]+$/.test(value) && !value.split('/').includes('..')) return true;
   try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password; } catch { return false; }
 }
 
