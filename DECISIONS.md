@@ -173,3 +173,16 @@
 - **Rejected**: Shipping live database/configuration files, reusing live data for previews, or triggering a scan during anonymous submission. Previews use illustrative API fixtures with outbound requests blocked.
 - **Clean startup fix**: Removing tracked runtime data exposed the database path being captured before test isolation and missing `data/` on fresh setups. Resolve/create the data directory inside `initDb`; retain runtime files on the server.
 - **Verification**: Full suite passed 54/54 from a new external temporary working directory after fixing clean database startup. Earlier attempts failed on missing data directory and a corrected local path variable. Sanitized Chromium previews passed at 375px and 1440px with no horizontal page overflow; source syntax, diff checks and credential scans passed. No real test notifications sent.
+
+## 17. GitHub Links and Ad Integration (2026-10-31)
+- **Chosen**:
+  - Add repository links to `https://github.com/hzzmonetvn/keyboxhub-web` in both the main header navigation actions (`.nav-actions`) and the footer (`.footer-content`).
+  - Use responsive text display with `.btn-label` to collapse link text to an icon button on narrow mobile screens while preserving minimum touch target dimensions (36x40px).
+  - Add Monetag service worker `public/sw.js` and loader script `public/ads.js` for ad zone integration, keeping them strictly excluded from git tracking in `.gitignore`.
+- **Considered & Rejected**:
+  - Placing GitHub link in the scrollable tab navigation bar: rejected to keep core operational navigation clear.
+  - Committing ad scripts and service workers to source control: rejected to keep repository clean and avoid shipping third-party network scripts into the open-source repository.
+- **Verification**:
+  - Full test suite passed (54/54).
+  - Verified local server response on port 8098 for navbar and footer links.
+  - Changes pushed to `origin/main`.
