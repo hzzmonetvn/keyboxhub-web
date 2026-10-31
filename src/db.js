@@ -127,21 +127,38 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_reports_key_ip ON reports(key_id, reporter_ip);
   `);
 
-  // Seed default 3rd-party sources once; later admin deletions remain deleted.
+  // Seed or supplement default 3rd-party sources (INSERT OR IGNORE respects existing records & admin modifications)
+  const defaultSources = [
+    { name: "Specter Catalog (KOW, Yuri, Xiaomi)", type: "specter", url: "https://rawbin.dpejoh.com/catalog" },
+    { name: "Yurikey (Yurii0307 Official)", type: "raw_url", url: "https://raw.githubusercontent.com/Yurii0307/yurikey/main/key" },
+    { name: "AlwaysStrong (@evokerr)", type: "raw_url", url: "https://evoker.qzz.io/key" },
+    { name: "Evolution X", type: "raw_url", url: "https://git.evolution-x.org/EvoX/keybox/raw/branch/main/keybox.xml" },
+    { name: "ZKOS Database", type: "raw_url", url: "https://raw.githubusercontent.com/zuri1503/Toolbox-Database/refs/heads/main/keybox.xml" },
+    { name: "dare-devil-ex / keyboxxBot", type: "raw_url", url: "https://raw.githubusercontent.com/dare-devil-ex/keyboxxBot/main/keybox.xml" },
+    { name: "TrickBox (GueRapii / Charlie)", type: "raw_url", url: "https://raw.githubusercontent.com/GueRapii/randommodulesfiles/main/file.enc" },
+    { name: "GreyElaina / Gist", type: "raw_url", url: "https://gist.githubusercontent.com/GreyElaina/2401596f3b8a01f8602768ad5221e2fd/raw/kb_b.xml" },
+    { name: "mywoopies / mejson", type: "raw_url", url: "https://raw.githubusercontent.com/mywoopies/mejson/refs/heads/main/keystore.xml" },
+  ];
   const insertSource = db.prepare("INSERT OR IGNORE INTO sources (name, type, url, enabled) VALUES (?, ?, ?, 1)");
-  if (getMeta("default_sources_seeded") !== "1") {
-  insertSource.run("Specter Catalog (KOW, Yuri, Xiaomi)", "specter", "https://rawbin.dpejoh.com/catalog");
-  insertSource.run("Yurikey (Yurii0307 Official)", "raw_url", "https://raw.githubusercontent.com/Yurii0307/yurikey/main/key");
-  insertSource.run("AlwaysStrong (@evokerr)", "raw_url", "https://evoker.qzz.io/key");
-  insertSource.run("TrickBox (GueRapii / Charlie)", "raw_url", "https://raw.githubusercontent.com/GueRapii/randommodulesfiles/main/file.enc");
-  insertSource.run("dare-devil-ex / keyboxxBot", "raw_url", "https://raw.githubusercontent.com/dare-devil-ex/keyboxxBot/main/keybox.xml");
-  insertSource.run("FREECAMK / Play-Integrity", "raw_url", "https://raw.githubusercontent.com/FREECAMK/Keybox-Play-Integrity-/main/keybox.xml");
-  insertSource.run("davidepalma.it", "raw_url", "https://www.davidepalma.it/pib/keybox.xml");
-  insertSource.run("GreyElaina / Gist", "raw_url", "https://gist.githubusercontent.com/GreyElaina/2401596f3b8a01f8602768ad5221e2fd/raw/kb_b.xml");
-  insertSource.run("zuri1503 / Toolbox-Database", "raw_url", "https://raw.githubusercontent.com/zuri1503/Toolbox-Database/main/keybox.xml");
-  insertSource.run("AnhTran1006 / Toolbox-Data", "raw_url", "https://raw.githubusercontent.com/AnhTran1006/Toolbox-Data/main/Toolbox-data/keybox.xml");
-  setMeta("default_sources_seeded", "1");
+  for (const s of defaultSources) {
+    insertSource.run(s.name, s.type, s.url);
   }
+
+  // Disable known defunct / 404 / 502 / dummy test sources to keep cron logs clean
+  const defunctSources = [
+    "https://raw.githubusercontent.com/FREECAMK/Keybox-Play-Integrity-/main/keybox.xml",
+    "https://raw.githubusercontent.com/AnhTran1006/Toolbox-Data/main/Toolbox-data/keybox.xml",
+    "https://www.davidepalma.it/pib/keybox.xml",
+    "https://proxy.corsfix.com/?https://keybox.kowx712.cc/api/keyboxes",
+    "http://evoker.qzz.io/key",
+  ];
+  const disableDefunct = db.prepare("UPDATE sources SET enabled = 0 WHERE url = ? AND enabled = 1");
+  for (const url of defunctSources) {
+    disableDefunct.run(url);
+  }
+  db.prepare("DELETE FROM sources WHERE url = 'https://example.test/community'").run();
+
+  setMeta("default_sources_seeded", "1");
 
   const lastUpdated = getMeta("last_updated");
   if (!lastUpdated) {

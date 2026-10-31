@@ -186,3 +186,16 @@
   - Full test suite passed (54/54).
   - Verified local server response on port 8098 for navbar and footer links.
   - Changes pushed to `origin/main`.
+
+## 18. Standardized Community Keybox Sources and Database Sanitization (2026-10-31)
+- **Chosen**:
+  - Standardize default 3rd-party community sources to include active verified endpoints: Specter Catalog, Yurikey (Yurii0307), AlwaysStrong (@evokerr), Evolution X, ZKOS Database (zuri1503), dare-devil-ex, TrickBox (GueRapii), GreyElaina, and mywoopies/mejson.
+  - In `initDb()`, use `INSERT OR IGNORE` to incrementally seed any missing default sources across updates without overwriting existing administrator modifications.
+  - Automatically disable known defunct sources returning HTTP 404/502 (FREECAMK, AnhTran1006, davidepalma, corsfix proxy, plain HTTP AlwaysStrong) and purge dummy test URLs (`example.test/community`) to eliminate noise and wasted timeouts in periodic cron loot cycles.
+  - Safely synchronize the persistent `data/keybox.db` database file before service restart to ensure zero key loss and smooth process handover.
+- **Considered & Rejected**:
+  - Resetting or truncating the database sources table: rejected to preserve any user-added community sources and operational metadata.
+  - Leaving defunct 404/502 endpoints enabled: rejected to prevent periodic looter cycles from spamming error logs.
+- **Verification**:
+  - Full test suite passed (54/54).
+  - Service restarted (`systemctl restart keybox`); verified clean looter cycle completing in 7 seconds with zero 404/502 errors and 2 active valid keyboxes intact.
