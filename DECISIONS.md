@@ -214,3 +214,21 @@
   - Test suite passed 54/54 tests, including new unit test assertions for `/media/` path validation and directory traversal prevention.
   - Service restarted (`systemctl restart keybox.service`); verified HTTP 200 OK, `video/mp4`, `audio/mpeg`, and `image/jpeg` byte-range headers on port 8098.
 
+## 20. AdBlock Detection and Polite Skip Modal (2026-10-31)
+- **Chosen**:
+  - Implement dual-layer AdBlock detection combining a standard DOM bait element (`.adsbox`, `.pub_300x250`, etc.) and a non-cors network probe to detect both cosmetic element blocking and network request filters.
+  - Delay detection by 1.5 seconds after page load to prevent blocking initial rendering and ensure accurate filter evaluation.
+  - Present a theme-aware glassmorphic modal inspired by the MiFirm design with a polite apology, emoji, and explanation that ad revenue sustains the free server.
+  - Provide two straightforward actions:
+    - Primary button ("Đã hiểu, tôi đã tắt" / "Understood, I turned it off") to reload the page when the user disables their blocker.
+    - Dismissive text button ("Bỏ qua, tôi không muốn giúp" / "I do not want to help") saving dismissal state in `sessionStorage` so users can proceed unhindered without being nagged again during the session.
+  - Integrate dynamic bilingual translations (Vietnamese and English) syncing automatically with the site language switch.
+- **Considered & Rejected**:
+  - Persistent localStorage cooldown or hard wall blocking keybox downloads: rejected in accordance with user choice to always allow skipping without degrading keybox lookup or download capabilities.
+  - Third-party bloated adblock detection libraries: rejected in favor of lightweight (~40 lines) zero-dependency vanilla JS directly inside `public/app.js`.
+- **Verification**:
+  - Full test suite passed (54/54).
+  - Validated syntax with `node --check public/app.js`.
+  - Service restarted and static assets verified.
+
+

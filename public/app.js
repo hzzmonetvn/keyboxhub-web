@@ -175,7 +175,11 @@ const translations = {
     apiDescRepair: "Sửa lỗi & chuẩn hóa keybox (sắp xếp chuỗi cert, bổ sung Google Root, ngắt dòng 64 ký tự PEM)",
     repairingStatus: "Đang sửa lỗi & chuẩn hóa...",
     repairSuccessToast: "Keybox đã được sửa lỗi & chuẩn hóa thành công!",
-    repairNoContentPrompt: "Vui lòng chọn file hoặc dán nội dung keybox cần sửa lỗi!"
+    repairNoContentPrompt: "Vui lòng chọn file hoặc dán nội dung keybox cần sửa lỗi!",
+    adblockTitle: "Rất tiếc vì sự bất tiện này! 😥",
+    adblockDesc: "Vui lòng tắt trình chặn quảng cáo (AdBlock) để ủng hộ Keybox Hub. Trang web hoạt động hoàn toàn miễn phí; doanh thu quảng cáo là nguồn duy nhất giúp chúng tôi trang trải chi phí máy chủ và vận hành. Cảm ơn bạn rất nhiều!",
+    adblockTurnedOff: "Đã hiểu, tôi đã tắt",
+    adblockSkip: "Bỏ qua, tôi không muốn giúp"
   },
   en: {
     notificationsNav: "Notifications",
@@ -346,7 +350,11 @@ const translations = {
     apiDescRepair: "Repair & standardize keybox (reorder chain, append Google Root, wrap 64-char PEM lines)",
     repairingStatus: "Repairing & standardizing...",
     repairSuccessToast: "Keybox repaired and standardized successfully!",
-    repairNoContentPrompt: "Please choose a file or paste keybox content to repair!"
+    repairNoContentPrompt: "Please choose a file or paste keybox content to repair!",
+    adblockTitle: "I am so sorry! 😥",
+    adblockDesc: "Please disable AdBlock to support Keybox Hub. Keybox Hub is completely free, and ads are our only way to keep the server running. Thank you!",
+    adblockTurnedOff: "Understood, I turned it off",
+    adblockSkip: "I do not want to help"
   }
 };
 
@@ -1470,3 +1478,96 @@ window.addEventListener('keybox-settings', event => {
     cycle.textContent = currentLang === 'vi' ? 'Theo cấu hình quản trị' : 'Managed schedule';
   }
 });
+
+function initAdblockDetection() {
+  if (sessionStorage.getItem('keybox_adblock_dismissed') === '1') return;
+
+  function showModal() {
+    if (document.getElementById('adblock-modal') || sessionStorage.getItem('keybox_adblock_dismissed') === '1') return;
+    const backdrop = document.createElement('div');
+    backdrop.id = 'adblock-modal';
+    backdrop.className = 'adblock-modal-backdrop';
+    backdrop.setAttribute('role', 'dialog');
+    backdrop.setAttribute('aria-modal', 'true');
+    backdrop.setAttribute('aria-labelledby', 'adblock-modal-title');
+
+    backdrop.innerHTML = `
+      <div class="adblock-modal-card">
+        <div class="adblock-icon" aria-hidden="true">😥</div>
+        <h2 id="adblock-modal-title" class="adblock-title" data-i18n="adblockTitle">${t('adblockTitle')}</h2>
+        <p class="adblock-message" data-i18n="adblockDesc">${t('adblockDesc')}</p>
+        <div class="adblock-actions">
+          <button type="button" class="adblock-btn-confirm" id="btn-adblock-confirm">
+            <span aria-hidden="true">👍</span>
+            <span data-i18n="adblockTurnedOff">${t('adblockTurnedOff')}</span>
+          </button>
+          <button type="button" class="adblock-btn-skip" id="btn-adblock-skip">
+            <span aria-hidden="true">😔</span>
+            <span data-i18n="adblockSkip">${t('adblockSkip')}</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.append(backdrop);
+    requestAnimationFrame(() => {
+      backdrop.classList.add('show');
+    });
+
+    document.getElementById('btn-adblock-confirm')?.addEventListener('click', () => {
+      window.location.reload();
+    });
+
+    document.getElementById('btn-adblock-skip')?.addEventListener('click', () => {
+      sessionStorage.setItem('keybox_adblock_dismissed', '1');
+      backdrop.classList.remove('show');
+      setTimeout(() => backdrop.remove(), 250);
+    });
+  }
+
+  setTimeout(async () => {
+    let detected = false;
+
+    // Test 1: Bait DOM element with common ad classes
+    const bait = document.createElement('div');
+    bait.className = 'ad-banner adsbox pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links';
+    bait.style.cssText = 'position:absolute;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;';
+    document.body.append(bait);
+
+    const styles = window.getComputedStyle(bait);
+    if (
+      bait.offsetParent === null ||
+      bait.offsetHeight === 0 ||
+      styles.display === 'none' ||
+      styles.visibility === 'hidden'
+    ) {
+      detected = true;
+    }
+    bait.remove();
+
+    // Test 2: Network fetch test to a standard ad network script
+    if (!detected) {
+      try {
+        const req = new Request('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', {
+          method: 'HEAD',
+          mode: 'no-cors',
+          cache: 'no-store'
+        });
+        await fetch(req);
+      } catch {
+        detected = true;
+      }
+    }
+
+    if (detected) {
+      showModal();
+    }
+  }, 1500);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAdblockDetection);
+} else {
+  initAdblockDetection();
+}
+
