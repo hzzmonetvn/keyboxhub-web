@@ -231,4 +231,14 @@
   - Validated syntax with `node --check public/app.js`.
   - Service restarted and static assets verified.
 
+## 21. Revert PC Background to Static Image (2026-10-31)
+- **Chosen**:
+  - Revert PC desktop background to the previous high-quality static image `/images/bg.jpg` (`desktop_type: "image"`).
+  - Clear `music_url` and remove the unused 2.3MB media files (`public/media/bg.mp4`, `public/media/bg.mp3`, `public/media/bg-poster.jpg`) to keep the repository lean.
+  - Maintain the generic `/media/` URL validation support in `src/site-settings.js` and `public/admin.js` for future media usage.
+- **Verification**:
+  - Full test suite passed (54/54).
+  - Re-verified `/api/site-settings` and static image asset delivery HTTP 200 OK on port 8098.
+
+
 
