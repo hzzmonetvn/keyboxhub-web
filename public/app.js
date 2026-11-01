@@ -174,12 +174,12 @@ const translations = {
     downloadRepairedBtn: "Tải keybox.xml Đã Sửa",
     apiDescRepair: "Sửa lỗi & chuẩn hóa keybox (sắp xếp chuỗi cert, bổ sung Google Root, ngắt dòng 64 ký tự PEM)",
     repairingStatus: "Đang sửa lỗi & chuẩn hóa...",
-    repairSuccessToast: "Keybox đã được sửa lỗi & chuẩn hóa thành công!",
-    repairNoContentPrompt: "Vui lòng chọn file hoặc dán nội dung keybox cần sửa lỗi!",
-    adblockTitle: "Rất tiếc vì sự bất tiện này! 😥",
-    adblockDesc: "Vui lòng tắt trình chặn quảng cáo (AdBlock) để ủng hộ Keybox Hub. Trang web hoạt động hoàn toàn miễn phí; doanh thu quảng cáo là nguồn duy nhất giúp chúng tôi trang trải chi phí máy chủ và vận hành. Cảm ơn bạn rất nhiều!",
-    adblockTurnedOff: "Đã hiểu, tôi đã tắt",
-    adblockSkip: "Bỏ qua, tôi không muốn giúp"
+    repairSuccessToast: "Keybox đã được sửa lỗi & chuẩn hóa thành công",
+    repairNoContentPrompt: "Vui lòng chọn file hoặc dán nội dung keybox cần sửa lỗi",
+    adblockTitle: "Hỗ trợ duy trì máy chủ",
+    adblockDesc: "Trang web duy trì máy chủ và kiểm tra chứng chỉ hoàn toàn miễn phí nhờ quảng cáo. Vui lòng tắt trình chặn quảng cáo để ủng hộ dự án.",
+    adblockTurnedOff: "Đã tắt trình chặn",
+    adblockSkip: "Bỏ qua lần này"
   },
   en: {
     notificationsNav: "Notifications",
@@ -349,12 +349,12 @@ const translations = {
     downloadRepairedBtn: "Download Repaired keybox.xml",
     apiDescRepair: "Repair & standardize keybox (reorder chain, append Google Root, wrap 64-char PEM lines)",
     repairingStatus: "Repairing & standardizing...",
-    repairSuccessToast: "Keybox repaired and standardized successfully!",
-    repairNoContentPrompt: "Please choose a file or paste keybox content to repair!",
-    adblockTitle: "I am so sorry! 😥",
-    adblockDesc: "Please disable AdBlock to support Keybox Hub. Keybox Hub is completely free, and ads are our only way to keep the server running. Thank you!",
-    adblockTurnedOff: "Understood, I turned it off",
-    adblockSkip: "I do not want to help"
+    repairSuccessToast: "Keybox repaired and standardized successfully",
+    repairNoContentPrompt: "Please choose a file or paste keybox content to repair",
+    adblockTitle: "Support server hosting",
+    adblockDesc: "Keybox Hub provides free certificate verification and distribution. Please consider disabling your ad blocker to help cover server expenses.",
+    adblockTurnedOff: "AdBlock disabled",
+    adblockSkip: "Skip for now"
   }
 };
 
@@ -1493,16 +1493,21 @@ function initAdblockDetection() {
 
     backdrop.innerHTML = `
       <div class="adblock-modal-card">
-        <div class="adblock-icon" aria-hidden="true">😥</div>
+        <div class="adblock-icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
         <h2 id="adblock-modal-title" class="adblock-title" data-i18n="adblockTitle">${t('adblockTitle')}</h2>
         <p class="adblock-message" data-i18n="adblockDesc">${t('adblockDesc')}</p>
         <div class="adblock-actions">
           <button type="button" class="adblock-btn-confirm" id="btn-adblock-confirm">
-            <span aria-hidden="true">👍</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
             <span data-i18n="adblockTurnedOff">${t('adblockTurnedOff')}</span>
           </button>
           <button type="button" class="adblock-btn-skip" id="btn-adblock-skip">
-            <span aria-hidden="true">😔</span>
             <span data-i18n="adblockSkip">${t('adblockSkip')}</span>
           </button>
         </div>

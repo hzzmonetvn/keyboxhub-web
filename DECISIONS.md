@@ -240,5 +240,24 @@
   - Full test suite passed (54/54).
   - Re-verified `/api/site-settings` and static image asset delivery HTTP 200 OK on port 8098.
 
+## 22. Unslop Interface Overhaul (2026-11-01)
+- **Chosen**:
+  - Execute a comprehensive 9-pass design unslopping across `public/style.css`, `public/app.js`, and `public/index.html`.
+  - **Spacing**: Snap all paddings, margins, gaps, and heights to a strict 4px grid. Normalize header height from an oversized 84px to a compact 60px app bar. Container padding set to 24px desktop and 16px mobile.
+  - **Color**: Eliminate hardcoded hex values (`#202d47`, `#43577e`, `#151e2e`, `#1f2b3f`, `#586985`, `#101622f5`). Introduce a unified Ink neutral dark ramp (`#0b0d14` canvas, `#11141c` surface, `#1a1e28` elevated, `#222836` subtle) with quiet 8% hairline borders and a single focused accent.
+  - **Icons**: Remove casual emojis (`😥`, `👍`, `😔`) from the AdBlock modal and replace them with crisp, standardized SVG line icons and a dedicated icon wrap badge.
+  - **Copy**: Adopt calm, professional, technical phrasing. Remove trailing exclamation marks from status messages and toasts. Refactor AdBlock messaging from guilt-inducing phrasing to respectful developer-focused explanations.
+  - **Typography**: Eliminate extreme weights (700/800) in favor of 400/500 with 600 reserved for primary headings. Remove sub-10px unreadable fonts and enforce tabular numbers for metric counters.
+  - **Nested Radius Math**: Replace random 9999px pills and oversized 32px borders with mathematical nested radii (`R_inner = max(4px, R_outer - padding)`): 16px cards, 8px inputs/controls, and 6px tags/badges.
+  - **Visuals & Motion**: Standardize easing to `cubic-bezier(0.22, 1, 0.36, 1)`, hovers to 150ms, and maintain strict reduced-motion safeguards.
+- **Considered & Rejected**:
+  - Retaining arbitrary border radii and heavy border-top colored accents: rejected to avoid visual noise and ensure consistency across dense data views.
+  - Generic template re-skinning: rejected in favor of an exact technical hardware-security console aesthetic tailored to Android attestation and X.509 verification.
+- **Verification**:
+  - 54/54 automated tests passing.
+  - Validated syntax with `node --check public/app.js`.
+  - Service restarted (`systemctl restart keybox.service`) and verified live HTTP 200 responses on port 8098.
+
+
 
 
