@@ -46,6 +46,7 @@
           <a href="#repository" data-i18n="navRepository">Kho keybox</a>
           <a href="#repair" data-i18n="navRepair">Sửa lỗi keybox</a>
           <a href="#sources" data-i18n="navSources">Nguồn</a>
+          <a href="#logs" data-i18n="navLogs">Log</a>
           <a href="/admin" data-i18n="adminNav">Quản trị</a>
           <a href="#api-docs">API</a>
         </nav>
@@ -164,7 +165,7 @@
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
               </svg>
             </span>
-            <span class="badge-tag badge-rkp">GOOGLE RKP</span>
+            <span class="badge-tag badge-banned">BANNED</span>
           </div>
           <div class="stat-num text-cyan" id="stat-banned">0</div>
           <div class="stat-label-wrap">
@@ -586,6 +587,27 @@
                 </td>
               </tr>
             </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- RECENT KEY EVENTS -->
+      <section class="bento-card table-card" id="logs">
+        <div class="table-toolbar">
+          <div>
+            <h3 style="font-size: 18px; font-weight: 700;" data-i18n="logsTitle">Log gần đây</h3>
+            <p class="section-desc" data-i18n="logsDesc">10 sự kiện mới nhất trên toàn hệ thống.</p>
+          </div>
+        </div>
+        <div class="table-responsive" tabindex="0">
+          <table class="data-table">
+            <thead><tr>
+              <th data-i18n="thDevice">Device ID</th>
+              <th data-i18n="thSerial">Số Serial</th>
+              <th data-i18n="thStatus">Trạng thái</th>
+              <th data-i18n="thLogDate">Ngày</th>
+            </tr></thead>
+            <tbody id="logs-table-body"><tr><td colspan="4" class="text-center py-3" data-i18n="loadingLogs">Đang tải log...</td></tr></tbody>
           </table>
         </div>
       </section>

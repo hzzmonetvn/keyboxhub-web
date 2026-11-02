@@ -54,6 +54,12 @@ const translations = {
     skipContent: "Đến nội dung chính",
     viewDocs: "Tài liệu API",
     navSources: "Nguồn",
+    navLogs: "Log",
+    logsTitle: "Log gần đây",
+    logsDesc: "10 sự kiện mới nhất trên toàn hệ thống.",
+    thLogDate: "Ngày",
+    loadingLogs: "Đang tải log...",
+    noLogs: "Chưa có sự kiện nào.",
     navRepository: "Kho keybox",
     adminNav: "Quản trị",
     navOverview: "Tổng quan",
@@ -229,6 +235,12 @@ const translations = {
     skipContent: "Skip to main content",
     viewDocs: "API documentation",
     navSources: "Sources",
+    navLogs: "Logs",
+    logsTitle: "Recent logs",
+    logsDesc: "The 10 most recent events across the system.",
+    thLogDate: "Date",
+    loadingLogs: "Loading logs...",
+    noLogs: "No events yet.",
     navRepository: "Repository",
     adminNav: "Admin",
     navOverview: "Overview",
@@ -415,6 +427,7 @@ function applyLanguage(lang) {
   loadStatus();
   renderKeysTable();
   loadSources();
+  loadLogs();
 }
 
 function escapeHTML(v) {
@@ -843,6 +856,31 @@ if (sourceForm) {
       submit.disabled = false;
     }
   });
+}
+
+// Fetch and render recent system-wide key events
+async function loadLogs() {
+  const tbody = document.getElementById("logs-table-body");
+  if (!tbody) return;
+  try {
+    const res = await fetch("/api/logs?ts=" + Date.now(), {
+      headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const logs = data.logs || [];
+    tbody.innerHTML = logs.length ? logs.map(log => `
+      <tr>
+        <td><code>${escapeHTML(log.device_id)}</code></td>
+        <td><code>${escapeHTML(log.serial || "—")}</code></td>
+        <td><span class="badge-tag badge-${log.status === "banned" ? "banned" : log.status === "device" ? "device" : "strong"}">${escapeHTML(log.status)}</span></td>
+        <td><small>${formatTime(log.created_at)}</small></td>
+      </tr>
+    `).join("") : `<tr><td colspan="4" class="text-center py-3" style="color:var(--text-dim);">${t("noLogs")}</td></tr>`;
+  } catch (err) {
+    console.error("Could not load logs:", err);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-3 text-danger">${t("connError")}: ${escapeHTML(err.message)}</td></tr>`;
+  }
 }
 
 // Fetch and render 3rd-party Sources
@@ -1467,6 +1505,7 @@ function setRefreshInterval(seconds) {
     loadStatus();
     loadKeys();
     loadSources();
+    loadLogs();
   }, seconds * 1000);
 }
 setRefreshInterval(60);

@@ -10,8 +10,9 @@ import {
   getRandomValidKeybox,
   getKeyboxById,
   getKeyboxByFilter,
-  getAllKeyboxesPublic, 
-  reportKeybox, 
+  getAllKeyboxesPublic,
+  getRecentKeyboxLogs,
+  reportKeybox,
   getSystemStatus, 
   touchLastUpdated, 
   recheckAllKeysInDb,
@@ -258,6 +259,7 @@ app.get("/api/site-settings", (req, res) => {
   const { appearance, media, intervals } = getSiteSettings();
   res.json({ appearance, media, intervals: { browser_seconds: intervals.browser_seconds } });
 });
+app.get("/api/logs", (req, res) => res.json({ logs: getRecentKeyboxLogs() }));
 app.use("/api/admin", requireAdmin);
 app.get("/api/admin/settings", (req, res) => res.json(getSiteSettings()));
 app.put("/api/admin/settings", (req, res) => {

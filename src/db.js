@@ -32,6 +32,14 @@ export function initDb() {
       created_ip TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS keybox_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id TEXT NOT NULL,
+      serial TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('added', 'device', 'banned')),
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS reports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       key_id INTEGER NOT NULL,
@@ -174,6 +182,17 @@ export function getMeta(key) {
   return row ? row.value : null;
 }
 
+function recordKeyboxLog(deviceId, serials, status, createdAt = new Date().toISOString()) {
+  const serial = Array.isArray(serials) ? serials[0] : serials;
+  db.prepare("INSERT INTO keybox_logs (device_id, serial, status, created_at) VALUES (?, ?, ?, ?)")
+    .run(deviceId || "Unknown Device", String(serial || ""), status, createdAt);
+  db.prepare("DELETE FROM keybox_logs WHERE id NOT IN (SELECT id FROM keybox_logs ORDER BY id DESC LIMIT 10)").run();
+}
+
+export function getRecentKeyboxLogs() {
+  return db.prepare("SELECT device_id, serial, status, created_at FROM keybox_logs ORDER BY id DESC LIMIT 10").all();
+}
+
 export function setMeta(key, value) {
   db.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?").run(key, value, value);
 }
@@ -259,15 +278,21 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
   const isOverallPass = analysis.overall === "pass" || analysis.overall === "warn";
   if (!isOverallPass) {
     const isRevoked = analysis.isSpecterRevoked || analysis.keyboxes.some(kb => kb.keys.some(key => key.revocation?.hits?.length));
+    const rejectedAt = new Date().toISOString();
+    const deviceId = analysis.keyboxes.map(k => k.deviceId).filter(Boolean).join(", ") || "Unknown Device";
+    const serials = extractLeafSerials(analysis).serials;
+    if (isRevoked) recordKeyboxLog(deviceId, serials, "banned", rejectedAt);
     return {
       id: null,
       skipped: false,
       isNew: false,
       isBanned: true,
       status: isRevoked ? "banned" : "invalid",
-      deviceId: analysis.keyboxes.map(k => k.deviceId).filter(Boolean).join(", ") || "Unknown Device",
+      deviceId,
       algorithm: Array.from(new Set(analysis.keyboxes.flatMap(k => k.keys.map(key => key.algorithm)))).join(", ") || "Unknown",
-      reason: analysis.errors.join("; ") || "Keybox không hợp lệ. Hệ thống từ chối lưu trữ."
+      reason: analysis.errors.join("; ") || "Keybox không hợp lệ. Hệ thống từ chối lưu trữ.",
+      serials,
+      loggedAt: rejectedAt
     };
   }
 
@@ -334,6 +359,7 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
         existing.id
       );
 
+      if (upgradedStatus === "device" && existing.status !== "device") recordKeyboxLog(deviceId, candidateSerials, "device", now);
       touchLastUpdated();
       void notifyKeyboxEvent("keybox.status_changed", getKeyboxById(existing.id), existing.status, getSystemStatus());
 
@@ -446,6 +472,7 @@ export function addKeyboxSkipDuplicate(xmlContent, analysis, ip = "", source = "
     isRkp ? 1 : 0
   );
 
+  recordKeyboxLog(deviceId, candidateSerials, "added", now);
   touchLastUpdated();
   void notifyKeyboxEvent("keybox.added", getKeyboxById(info.lastInsertRowid), null, getSystemStatus());
   return {
@@ -674,7 +701,13 @@ export function reportKeybox(keyId, reporterIp = "") {
     newStatus = "device";
   }
 
-  db.prepare("UPDATE keyboxes SET report_device_count = ?, status = ? WHERE id = ?").run(newCount, newStatus, keyId);
+  const reportSerials = (() => {
+    try { return JSON.parse(key.serials || "[]"); } catch { return []; }
+  })();
+  db.transaction(() => {
+    db.prepare("UPDATE keyboxes SET report_device_count = ?, status = ? WHERE id = ?").run(newCount, newStatus, keyId);
+    if (newStatus !== key.status) recordKeyboxLog(key.device_id, reportSerials, "device", now);
+  })();
   touchLastUpdated();
   if (newStatus !== key.status) {
     void notifyKeyboxEvent("keybox.status_changed", getKeyboxById(keyId), key.status, getSystemStatus());
@@ -861,6 +894,9 @@ export async function recheckAllKeysInDb(trustData) {
       if (!isOverallPass) {
         bannedCount++;
         db.transaction(() => {
+          let bannedSerials = [];
+          try { bannedSerials = JSON.parse(k.serials || "[]"); } catch {}
+          recordKeyboxLog(k.device_id, bannedSerials, "banned", nowIso);
           db.prepare("DELETE FROM reports WHERE key_id = ?").run(k.id);
           db.prepare("DELETE FROM keyboxes WHERE id = ?").run(k.id);
           touchLastUpdated();
@@ -877,27 +913,30 @@ export async function recheckAllKeysInDb(trustData) {
         softbannedCount++;
       }
 
-      db.prepare(`
-        UPDATE keyboxes
-        SET check_result = ?,
-            last_checked_at = ?,
-            status = ?,
-            banned_at = NULL,
-            serials = ?,
-            is_softbanned = ?,
-            is_rkp = ?,
-            key_hash = COALESCE(?, key_hash)
-        WHERE id = ?
-      `).run(
-        JSON.stringify(analysis),
-        nowIso,
-        newStatus,
-        JSON.stringify(serials),
-        isSoftbanned ? 1 : 0,
-        isRkp ? 1 : 0,
-        keyHash,
-        k.id
-      );
+      db.transaction(() => {
+        if (newStatus === "device" && k.status !== "device") recordKeyboxLog(k.device_id, serials, "device", nowIso);
+        db.prepare(`
+          UPDATE keyboxes
+          SET check_result = ?,
+              last_checked_at = ?,
+              status = ?,
+              banned_at = NULL,
+              serials = ?,
+              is_softbanned = ?,
+              is_rkp = ?,
+              key_hash = COALESCE(?, key_hash)
+          WHERE id = ?
+        `).run(
+          JSON.stringify(analysis),
+          nowIso,
+          newStatus,
+          JSON.stringify(serials),
+          isSoftbanned ? 1 : 0,
+          isRkp ? 1 : 0,
+          keyHash,
+          k.id
+        );
+      })();
 
       updatedCount++;
       if (newStatus !== k.status || (isSoftbanned ? 1 : 0) !== k.is_softbanned) {

@@ -20,6 +20,7 @@ beforeEach(() => {
   s.state.trust = trust;
   s.db.prepare("DELETE FROM reports").run();
   s.db.prepare("DELETE FROM keyboxes").run();
+  s.db.prepare("DELETE FROM keybox_logs").run();
 });
 
 const count = () => s.db.prepare("SELECT COUNT(*) c FROM keyboxes").get().c;
@@ -61,6 +62,25 @@ test("rate limiter isolates IPs, returns Retry-After, resets windows and ignores
   assert.equal(invoke("198.51.100.3").passed, true);
 });
 
+test("system logs added keys and keeps only the 10 most recent events", async () => {
+  for (let i = 0; i < 11; i++) {
+    const key = makeKeybox({ alg: "rsa", serial: 4100 + i, deviceId: `log-device-${i}` });
+    s.state.trust = trustFor(key.certPem);
+    const response = await postJson(s.base, "/api/upload", { xml: key.xml });
+    assert.equal(response.status, 200);
+  }
+
+  const response = await fetch(s.base + "/api/logs");
+  assert.equal(response.status, 200);
+  const { logs } = await response.json();
+  assert.equal(logs.length, 10);
+  assert.equal(logs[0].device_id, "log-device-10");
+  assert.equal(logs[0].serial, "100e");
+  assert.equal(logs[0].status, "added");
+  assert.ok(logs[0].created_at);
+  assert.equal(logs.at(-1).device_id, "log-device-1");
+});
+
 test("raw JSON upload of RSA and EC keyboxes is accepted as strong", async () => {
   for (const k of [rsa, ec]) {
     const res = await postJson(s.base, "/api/upload", { xml: k.xml });
@@ -76,6 +96,21 @@ test("raw text upload accepted", async () => {
   const res = await postText(s.base, "/api/upload", rsa.xml);
   assert.equal(res.status, 200);
   assert.equal((await res.json()).status, "strong");
+});
+
+test("reporting a key as device records a system log event", async () => {
+  const { id } = await (await postJson(s.base, "/api/upload", { xml: rsa.xml })).json();
+  const { token } = createNotificationSubscriber("Device Reporter");
+  const response = await fetch(s.base + "/api/report", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ id })
+  });
+  assert.equal(response.status, 200);
+  const [log] = s.database.getRecentKeyboxLogs();
+  assert.equal(log.device_id, "api-rsa");
+  assert.equal(log.serial, "0fa1");
+  assert.equal(log.status, "device");
 });
 
 test("status, download, update, report threshold with auth token", async () => {
@@ -164,11 +199,16 @@ for (const privateKey of ["mismatch", "missing", "malformed"]) {
   });
 }
 
-test("revoked key is rejected with 422 and nothing stored", async () => {
+test("revoked key is rejected with 422 and logged as banned", async () => {
   s.state.trust = revoke(trustFor(rsa.certPem), 4001);
   const res = await postJson(s.base, "/api/upload", { xml: rsa.xml });
   assert.equal(res.status, 422);
   assert.equal(count(), 0);
+  const [log] = s.database.getRecentKeyboxLogs();
+  assert.equal(log.device_id, "api-rsa");
+  assert.equal(log.serial, "0fa1");
+  assert.equal(log.status, "banned");
+  assert.ok(log.created_at);
 });
 
 test("invalid duplicate of a stored key is validated first and rejected", async () => {

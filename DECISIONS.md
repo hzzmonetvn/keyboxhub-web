@@ -261,3 +261,13 @@
 
 
 
+
+## 23. Banned Status and Recent System Log (2026-11-02)
+- **Chosen**:
+  - Label the revoked-count metric `BANNED`; keep RKP reserved for the key profile classification.
+  - Create a SQLite `keybox_logs` event table and record only events from installation onward: accepted keys as `added`, transitions to `device`, and rejected/deleted revoked keys as `banned`. Store Device ID, one serial value (blank when unavailable), status, and event timestamp; expose only the newest 10 events across the whole installation at public `GET /api/logs`.
+  - Write banned events before rejecting an upload or deleting a previously stored key, preserving its identifiers after the key row is purged.
+- **Considered & Rejected**:
+  - Reconstructing prior history from current key rows: rejected because purged keys have no durable source data and the requested history starts when this feature is installed.
+  - Per-user logs or an unbounded audit table: rejected because the log is system-wide and must retain at most 10 entries.
+  - Requiring admin authentication for the display: rejected because the main dashboard log is public-facing and holds only key metadata already exposed by the public key listing.
