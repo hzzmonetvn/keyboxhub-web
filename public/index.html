@@ -12,7 +12,18 @@
       href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=8.7" />
+    <link rel="stylesheet" href="style.css?v=8.8" />
+    <script>
+      (() => {
+        try {
+          const saved = localStorage.getItem('keybox_theme');
+          const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          const theme = saved === 'light' || (saved !== 'dark' && prefersLight) ? 'light' : 'dark';
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.dataset.themeMode = saved || 'auto';
+        } catch {}
+      })();
+    </script>
     <script
       async
       src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7263466911273897"
@@ -64,6 +75,15 @@
             </svg>
             <span class="btn-label">GitHub</span>
           </a>
+
+          <button id="btn-theme-toggle" class="btn btn-secondary btn-sm" title="Chuyển chế độ giao diện / Switch theme" aria-label="Chuyển chế độ giao diện">
+            <svg id="theme-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <span id="theme-label" class="btn-label">Auto</span>
+          </button>
 
           <button id="btn-lang-toggle" class="btn btn-secondary btn-sm" title="Switch Language / Chuyển Đổi Ngôn Ngữ">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -700,7 +720,7 @@ curl -L -o keybox_hw.xml "https://keybox.hzzmonet.io.vn/api/download?profile=hw"
     </footer>
 
     <script src="/ads.js" defer data-cfasync="false"></script>
-    <script src="site-ui.js?v=1.1"></script>
-    <script src="app.js?v=8.7"></script>
+    <script src="site-ui.js?v=1.2"></script>
+    <script src="app.js?v=8.8"></script>
   </body>
 </html>

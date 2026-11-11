@@ -182,6 +182,15 @@ const translations = {
     repairingStatus: "Đang sửa lỗi & chuẩn hóa...",
     repairSuccessToast: "Keybox đã được sửa lỗi & chuẩn hóa thành công",
     repairNoContentPrompt: "Vui lòng chọn file hoặc dán nội dung keybox cần sửa lỗi",
+    themeAuto: "Tự động",
+    themeLight: "Sáng",
+    themeDark: "Tối",
+    themeAutoToast: "Chế độ giao diện: Tự động (theo hệ thống)",
+    themeLightToast: "Chế độ giao diện: Sáng",
+    themeDarkToast: "Chế độ giao diện: Tối",
+    themeToggleTitleAuto: "Chế độ: Tự động (nhấn để đổi)",
+    themeToggleTitleLight: "Chế độ: Sáng (nhấn để đổi)",
+    themeToggleTitleDark: "Chế độ: Tối (nhấn để đổi)",
     adblockTitle: "Hỗ trợ duy trì máy chủ",
     adblockDesc: "Trang web duy trì máy chủ và kiểm tra chứng chỉ hoàn toàn miễn phí nhờ quảng cáo. Vui lòng tắt trình chặn quảng cáo để ủng hộ dự án.",
     adblockTurnedOff: "Đã tắt trình chặn",
@@ -363,6 +372,15 @@ const translations = {
     repairingStatus: "Repairing & standardizing...",
     repairSuccessToast: "Keybox repaired and standardized successfully",
     repairNoContentPrompt: "Please choose a file or paste keybox content to repair",
+    themeAuto: "Auto",
+    themeLight: "Light",
+    themeDark: "Dark",
+    themeAutoToast: "Theme: Auto (system)",
+    themeLightToast: "Theme: Light",
+    themeDarkToast: "Theme: Dark",
+    themeToggleTitleAuto: "Theme: Auto (click to toggle)",
+    themeToggleTitleLight: "Theme: Light (click to toggle)",
+    themeToggleTitleDark: "Theme: Dark (click to toggle)",
     adblockTitle: "Support server hosting",
     adblockDesc: "Keybox Hub provides free certificate verification and distribution. Please consider disabling your ad blocker to help cover server expenses.",
     adblockTurnedOff: "AdBlock disabled",
@@ -424,6 +442,7 @@ function applyLanguage(lang) {
   if (newSourceName) newSourceName.placeholder = t("inputSourceNamePlaceholder");
 
   // Re-render UI
+  updateThemeToggleUI();
   loadStatus();
   renderKeysTable();
   loadSources();
@@ -500,6 +519,49 @@ const uploadStatus = document.getElementById("upload-status");
 const analysisResultPanel = document.getElementById("analysis-result-panel");
 const analysisResultBody = document.getElementById("analysis-result-body");
 const btnCloseResult = document.getElementById("btn-close-result");
+
+// Theme switcher toggle
+const btnThemeToggle = document.getElementById("btn-theme-toggle");
+
+function updateThemeToggleUI(mode) {
+  const btn = document.getElementById("btn-theme-toggle");
+  const label = document.getElementById("theme-label");
+  const icon = document.getElementById("theme-icon");
+  if (!btn || !label || !icon) return;
+
+  const activeMode = mode || (window.KeyboxTheme ? window.KeyboxTheme.getMode() : localStorage.getItem("keybox_theme") || "auto");
+
+  if (activeMode === "light") {
+    label.textContent = t("themeLight");
+    btn.title = t("themeToggleTitleLight");
+    btn.setAttribute("aria-label", t("themeToggleTitleLight"));
+    icon.innerHTML = '<circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line>';
+  } else if (activeMode === "dark") {
+    label.textContent = t("themeDark");
+    btn.title = t("themeToggleTitleDark");
+    btn.setAttribute("aria-label", t("themeToggleTitleDark"));
+    icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+  } else {
+    label.textContent = t("themeAuto");
+    btn.title = t("themeToggleTitleAuto");
+    btn.setAttribute("aria-label", t("themeToggleTitleAuto"));
+    icon.innerHTML = '<rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line>';
+  }
+}
+
+if (btnThemeToggle) {
+  btnThemeToggle.addEventListener("click", () => {
+    const nextMode = window.KeyboxTheme ? window.KeyboxTheme.cycle() : 'auto';
+    updateThemeToggleUI(nextMode);
+    const toastKey = nextMode === "light" ? "themeLightToast" : nextMode === "dark" ? "themeDarkToast" : "themeAutoToast";
+    showToast(t(toastKey), "info", 2000);
+  });
+}
+
+window.addEventListener("keybox-theme-change", (e) => {
+  updateThemeToggleUI(e.detail?.mode);
+});
+updateThemeToggleUI();
 
 // Language switcher toggle
 if (btnLangToggle) {

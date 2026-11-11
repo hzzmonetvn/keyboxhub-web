@@ -289,3 +289,23 @@
   - 56/56 automated unit/integration tests passing.
   - Clean syntax checks with `node --check public/app.js`.
   - Service restarted (`systemctl restart keybox.service`) and verified live HTTP response.
+
+## 25. Automatic & Toggle Dark/Light Mode with OS prefers-color-scheme (2026-11-11)
+- **Chosen**:
+  - Implement dynamic automatic dark/light mode synchronization matching visitor operating system preferences (`prefers-color-scheme: light/dark`) with live update listeners (`matchMedia.addEventListener('change')`).
+  - Introduce a 3-state visitor theme control (`Auto` → `Light` → `Dark` → `Auto`) in the navigation bar (`#btn-theme-toggle`), persisted via `localStorage.keybox_theme`.
+  - Provide an inline anti-FOUC initialization script in `<head>` of `public/index.html` to eliminate flash of wrong theme on first paint.
+  - Native CSS fallback via `@media (prefers-color-scheme: light)` for `:root:not([data-theme="dark"])` in `public/style.css`.
+  - Dynamic overlay adaptation (`--overlay-bg: #ffffff` in light mode, `#000000` in dark mode) ensuring background canvas images maintain high legibility under both modes.
+  - Luminance contrast safeguard: dynamically adjusting `--primary` and `--border-focus` to accessible indigo (`#4f5be8`) in light mode if the administrator's custom accent was tuned for dark mode.
+  - Standardized SVG icons (Monitor for Auto, Sun for Light, Moon for Dark) strictly conforming to `stroke-width="1.8"`.
+  - Full bilingual i18n integration in Vietnamese and English for labels, tooltips, aria-labels, and toast feedback.
+  - Bumped asset cache versions: `style.css?v=8.8`, `site-ui.js?v=1.2`, and `app.js?v=8.8`.
+- **Considered & Rejected**:
+  - *Binary Light/Dark toggle without Auto*: Rejected because users expect automated system-level synchronization by default.
+  - *Forcing server settings over visitor choice*: Rejected because client accessibility and viewing conditions require user-level preference precedence, with server mode serving as the graceful default.
+  - *Waiting for `/api/site-settings` before theme paint*: Rejected to avoid visual flickering (FOUC).
+- **Verification**:
+  - 56/56 automated unit/integration tests passing (`npm test`).
+  - Syntax verified with `node --check public/app.js` and `node --check public/site-ui.js`.
+  - Service restarted (`systemctl restart keybox.service`) and confirmed HTTP 200 response on port 8098.
