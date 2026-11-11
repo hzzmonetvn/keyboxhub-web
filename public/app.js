@@ -147,24 +147,24 @@ const translations = {
     noValidKey: "Không Có Key Khả Dụng",
     noKeysFound: "Không tìm thấy keybox nào phù hợp với bộ lọc hiện tại.",
     noKeysInDb: "Kho keybox đang trống. Hãy đóng góp file hoặc quét nguồn cộng đồng.",
-    copiedXmlToast: "Đã sao chép mã XML của Keybox vào Clipboard!",
+    copiedXmlToast: "Đã sao chép XML của keybox vào clipboard",
     copiedIdToast: "Đã sao chép: ",
     connError: "Lỗi kết nối tới máy chủ",
     reportConfirm: "Bạn có chắc chắn muốn báo cáo Keybox #",
     reportConfirmSuffix: " đã bị hạ cấp xuống Device Integrity? (Khi đủ trên 5 báo cáo, keybox sẽ tự động chuyển trạng thái)",
-    reportSuccess: "Báo cáo thành công!",
-    lootFinishedToast: "Hoàn tất Loot nguồn bên thứ 3!",
+    reportSuccess: "Báo cáo thành công",
+    lootFinishedToast: "Hoàn tất quét nguồn bên thứ ba",
     lootAddedText: "Thêm mới:",
     lootSkippedText: "Bỏ qua:",
-    recheckedGoogleToast: "Đã kiểm tra lại toàn bộ với Google!",
+    recheckedGoogleToast: "Đã kiểm tra lại toàn bộ với Google",
     statusStrongDesc: "Keybox Strong Integrity đang sẵn sàng. Yêu cầu tải xuống sẽ được ưu tiên cấp key Strong.",
     statusDeviceDesc: "Hiện không có key Strong. Bạn vẫn có thể tải keybox Device Integrity.",
     statusBannedDesc: "Chưa có keybox khả dụng. Đóng góp keybox hoặc quét nguồn cộng đồng để cập nhật.",
-    selectFilePrompt: "Vui lòng chọn file XML hoặc ZIP trước!",
-    enterXmlPrompt: "Vui lòng nhập nội dung XML!",
-    enterUrlPrompt: "Vui lòng nhập đường link URL của keybox!",
+    selectFilePrompt: "Vui lòng chọn file XML hoặc ZIP trước",
+    enterXmlPrompt: "Vui lòng nhập nội dung XML",
+    enterUrlPrompt: "Vui lòng nhập URL của keybox",
     checkingGoogle: "Đang kiểm tra với Google...",
-    uploadSuccess: "Tải lên thành công!",
+    uploadSuccess: "Tải lên thành công",
     uploadFailed: "Xác thực không thành công",
     addingSource: "Đang Thêm & Quét...",
     navRepair: "Sửa lỗi keybox",
@@ -328,24 +328,24 @@ const translations = {
     noValidKey: "No Keys Available",
     noKeysFound: "No keyboxes match the current filter.",
     noKeysInDb: "Your repository is empty. Contribute a file or scan community sources to get started.",
-    copiedXmlToast: "Keybox XML copied to clipboard!",
+    copiedXmlToast: "Keybox XML copied to clipboard",
     copiedIdToast: "Copied: ",
     connError: "Server connection error",
     reportConfirm: "Are you sure you want to report Keybox #",
     reportConfirmSuffix: " as degraded to Device Integrity? (Promotes to Device upon >5 reports)",
-    reportSuccess: "Report submitted successfully!",
-    lootFinishedToast: "3rd-party auto-loot cycle finished!",
+    reportSuccess: "Report submitted successfully",
+    lootFinishedToast: "Community source scan completed",
     lootAddedText: "Looted:",
     lootSkippedText: "Duplicates Skipped:",
-    recheckedGoogleToast: "Full database rechecked with Google!",
+    recheckedGoogleToast: "Full database rechecked with Google",
     statusStrongDesc: "Strong Integrity keyboxes are ready. Downloads will prioritize available Strong keys.",
     statusDeviceDesc: "No Strong keys are available right now. You can still download a Device Integrity keybox.",
     statusBannedDesc: "No keyboxes are available. Contribute a keybox or scan community sources to get started.",
-    selectFilePrompt: "Please select an XML or ZIP file first!",
-    enterXmlPrompt: "Please enter XML content!",
-    enterUrlPrompt: "Please enter keybox URL link!",
+    selectFilePrompt: "Please select an XML or ZIP file first",
+    enterXmlPrompt: "Please enter XML content",
+    enterUrlPrompt: "Please enter keybox URL",
     checkingGoogle: "Verifying with Google...",
-    uploadSuccess: "Uploaded successfully!",
+    uploadSuccess: "Uploaded successfully",
     uploadFailed: "Verification failed",
     addingSource: "Adding & Scanning...",
     navRepair: "Repair Keybox",
@@ -736,8 +736,8 @@ function renderKeysTable() {
     const serialCell = fullSerial ? `
       <td>
         <div style="display:flex; align-items:center; gap:6px;">
-          <code style="font-size:0.75rem;" title="${escapeHTML(fullSerial)}">${escapeHTML(shortSerial)}</code>
-          <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.7rem;" title="Copy Serial" data-copy="${escapeHTML(fullSerial)}">
+          <code style="font-size:11px;" title="${escapeHTML(fullSerial)}">${escapeHTML(shortSerial)}</code>
+          <button class="btn btn-secondary btn-micro" title="Copy Serial" data-copy="${escapeHTML(fullSerial)}">
             ${t("btnCopy")}
           </button>
         </div>
@@ -750,7 +750,7 @@ function renderKeysTable() {
         <td>
           <div style="display:flex; align-items:center; gap:6px;">
             <span title="${escapeHTML(k.device_id)}"><strong>${escapeHTML(k.device_id || "N/A")}</strong></span>
-            <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.7rem;" title="Copy Device ID" data-copy="${escapeHTML(k.device_id)}">
+            <button class="btn btn-secondary btn-micro" title="Copy Device ID" data-copy="${escapeHTML(k.device_id)}">
               ${t("btnCopy")}
             </button>
           </div>
@@ -758,7 +758,7 @@ function renderKeysTable() {
         ${serialCell}
         <td>
           <code>${escapeHTML(k.algorithm || "rsa")}</code>
-          ${k.is_rkp ? '<span class="badge-tag badge-rkp" style="margin-left:4px; font-size:8px; padding:2px 5px;" title="Remote Key Provisioning (RKP: EC Key & Google EC Root CA)">RKP</span>' : ''}
+          ${k.is_rkp ? '<span class="badge-tag badge-rkp" style="margin-left:4px;" title="Remote Key Provisioning (RKP: EC Key & Google EC Root CA)">RKP</span>' : ''}
         </td>
         <td>${statusBadge}</td>
         <td><small>${sourceBadge}</small></td>
@@ -953,7 +953,7 @@ window.copyKeyXml = async function(id) {
     const data = await res.json();
     if (!data.xml) throw new Error("XML content empty");
     await navigator.clipboard.writeText(data.xml);
-    showToast(currentLang === "vi" ? `Đã sao chép mã XML của Keybox #${id}!` : `Copied XML for Keybox #${id}!`, "success");
+    showToast(currentLang === "vi" ? `Đã sao chép XML của keybox #${id}` : `Copied XML for keybox #${id}`, "success");
   } catch (err) {
     showToast(`Error: ${err.message}`, "error");
   }

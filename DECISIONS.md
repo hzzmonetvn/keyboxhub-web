@@ -271,3 +271,21 @@
   - Reconstructing prior history from current key rows: rejected because purged keys have no durable source data and the requested history starts when this feature is installed.
   - Per-user logs or an unbounded audit table: rejected because the log is system-wide and must retain at most 10 entries.
   - Requiring admin authentication for the display: rejected because the main dashboard log is public-facing and holds only key metadata already exposed by the public key listing.
+
+## 24. Comprehensive Design Unslopping Pass (2026-11-11)
+- **Chosen**:
+  - Full execution of the unslop methodology across `public/style.css`, `public/app.js`, and `public/index.html`.
+  - **Grid & Dimensions**: Enforced strict 4px grid across all interactive controls and card layouts. Standardized control heights (`.studio-tab-btn`, `.input-styled`, `.search-input`, `.adblock-btn-confirm`) to 36px, with `.btn-micro` at 24px (replacing inline styles). Corrected `scroll-padding-top` to 112px.
+  - **Hairline Neutral Borders**: Replaced high-contrast neon/colored borders on status badges and tags (`.badge-strong`, `.badge-device`, `.badge-banned`, `.badge-rkp`, `.status-badge.*`) with calm hairlines (`var(--border)`).
+  - **Iconography Standardization**: Unified SVG stroke widths across the entire application interface to a consistent 1.8. Replaced colored icon wraps with neutral elevated surfaces (`var(--bg-surface-elevated)`).
+  - **Typography Normalization**: Stripped heavy weights (700/800) from Google Fonts imports for Be Vietnam Pro and JetBrains Mono, enforcing typographic hierarchy through scale (12px, 14px, 16px, 18px, 26px) and color contrast rather than extreme bold weights.
+  - **Sentence Case & Copy Calming**: Eliminated shouty all-caps tags (`TIER 1` → `Tier 1`, `FALLBACK` → `Fallback`, `BANNED` → `Banned`, `INVENTORY` → `Inventory`), removed `text-transform: uppercase` from `.section-eyebrow`, and stripped all exclamation marks (`!`) from user-facing toasts and notifications in both Vietnamese and English.
+  - **Inline Style Extraction**: Eradicated all scattered inline `style="..."` attributes from `public/index.html` and extracted them into semantic CSS utility classes (`.action-footer-wrap`, `.flex-1`, `.m-0`, `.panel-analysis`, `.modal-header-row`, `.panel-title`, `.table-title-group`, `.table-title`, `.empty-cell`, `.repair-meta-info`, `.repair-device-id`, `.repair-meta-actions`, `.repair-fixes-wrap`, `.repair-fixes-title`, `.footer-github-link`).
+  - **Asset Versioning**: Bumped asset cache query parameters to `v=8.7` for `style.css` and `app.js`.
+- **Considered & Rejected**:
+  - *Retaining bold font weights (700/800)*: Rejected because heavy bold weights distort Vietnamese diacritics and create typographic visual clutter in dense technical consoles.
+  - *Keeping colored borders on status badges*: Rejected because colored borders draw excessive eye focus away from primary data content, violating the "single bright element / quiet chrome" principle.
+- **Verification**:
+  - 56/56 automated unit/integration tests passing.
+  - Clean syntax checks with `node --check public/app.js`.
+  - Service restarted (`systemctl restart keybox.service`) and verified live HTTP response.
