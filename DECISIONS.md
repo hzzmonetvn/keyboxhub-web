@@ -315,3 +315,8 @@
 - **Preserved**: Existing dashboard data bindings, API routes, administrator-managed accent and background media, the Auto/Light/Dark cycle, and a separate admin interface. Mobile navigation wraps within the screen; wide tables keep their own scroll areas.
 - **Considered & Rejected**: A static product preview would duplicate the real dashboard and could drift from the current state. Forcing the reference's dark theme would discard visitor preferences. Replacing the existing navigation and form logic was unnecessary for the visual change.
 - **Verification**: 56 automated tests passed. An isolated Chromium run checked live status and table data, the repository anchor, search and filtering, upload and repair tab switching, both languages, theme persistence and OS-driven switching. Navigation was checked from 320 to 1440 pixels at ten viewport widths.
+
+## 27. Compact homepage navigation on scroll (2026-11-24)
+- **Chosen**: Past 96px, switch to a translucent 48px bar inset 8px from the top. Wide screens keep the navigation inline in a narrower frame; narrow screens keep the brand and a disclosure button. The existing links and controls serve both layouts.
+- **Considered & Rejected**: Shrinking the header's space in the page would move content during the transition. Duplicating the navigation would require synchronizing active links and controls. A fixed compact frame also keeps keyboard focus inside the open panel from scrolling the document back to the top.
+- **Verification**: 56 automated tests passed. Chromium checked eight viewport widths in Vietnamese dark mode and English light mode, stable page layout, menu focus and dismissal, anchor visibility, and theme and language controls.

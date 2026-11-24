@@ -63,6 +63,8 @@ const translations = {
     navRepository: "Kho keybox",
     adminNav: "Quản trị",
     navOverview: "Tổng quan",
+    navMenu: "Menu điều hướng",
+    navLanguage: "Đổi ngôn ngữ",
     pageIntro: "Theo dõi trạng thái chứng chỉ, tìm và chia sẻ keybox trong cùng một nơi.",
     pageTitle: "Trung tâm Keybox",
     heroRepository: "Xem kho keybox",
@@ -254,6 +256,8 @@ const translations = {
     navRepository: "Repository",
     adminNav: "Admin",
     navOverview: "Overview",
+    navMenu: "Navigation menu",
+    navLanguage: "Switch language",
     pageIntro: "Track certificate status, find keyboxes, and share them in one place.",
     pageTitle: "Your keybox workspace",
     heroRepository: "Browse keyboxes",
@@ -1546,8 +1550,42 @@ if (btnDownloadRepairedXml) {
 // Initial load & Setup Language
 applyLanguage(currentLang);
 loadKeys();
-const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+const navbar = document.querySelector('.navbar');
+const navMenu = navbar.querySelector('.nav-menu-toggle');
+const navPanel = navbar.querySelector('.nav-panel');
+const navLinks = navPanel.querySelectorAll('.nav-links a[href^="#"]');
+const narrowNav = matchMedia('(max-width: 1200px)');
+
+function closeNavMenu(returnFocus = false) {
+  if (navMenu.getAttribute('aria-expanded') !== 'true') return;
+  navMenu.setAttribute('aria-expanded', 'false');
+  if (returnFocus) navMenu.focus({ preventScroll: true });
+}
+
+navMenu.addEventListener('click', () => {
+  const open = navMenu.getAttribute('aria-expanded') === 'true';
+  navMenu.setAttribute('aria-expanded', String(!open));
+});
+navPanel.addEventListener('click', event => {
+  if (event.target.closest('.nav-links a')) closeNavMenu(true);
+});
+document.addEventListener('click', event => {
+  if (!navbar.contains(event.target)) closeNavMenu();
+});
+navbar.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeNavMenu(true);
+});
+narrowNav.addEventListener('change', () => closeNavMenu());
+
 function updateNavigation() {
+  const compact = window.scrollY > 96;
+  if (navbar.classList.contains('is-compact') !== compact) {
+    const focused = document.activeElement;
+    navbar.classList.toggle('is-compact', compact);
+    closeNavMenu();
+    if (compact && narrowNav.matches && navPanel.contains(focused)) navMenu.focus({ preventScroll: true });
+    if (!compact && focused === navMenu) navLinks[0].focus({ preventScroll: true });
+  }
   let active = '#overview';
   navLinks.forEach(link => {
     const section = document.querySelector(link.getAttribute('href'));
