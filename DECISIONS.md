@@ -326,3 +326,8 @@
 - **Chosen**: Add a bilingual copy button to each API example header. Reuse the existing clipboard helper and toast, reading the full displayed code so multi-line examples keep their formatting.
 - **Considered & Rejected**: Storing commands again in button attributes would allow the copied and displayed versions to drift.
 - **Verification**: 56 automated tests passed. Chromium verified all four clipboard values, keyboard activation, both languages, layouts at 320px and 1440px, and feedback when clipboard access was denied or unavailable.
+
+## 29. Refresh README previews (2026-11-24)
+- **Chosen**: Replace the two existing screenshots with the current homepage in desktop dark mode and mobile light mode with the compact navbar showing.
+- **Considered & Rejected**: Capturing the public site could include real data and custom appearance settings. The previews use an isolated local database with demo rows and no outbound requests.
+- **Verification**: Inspected both Chromium screenshots and confirmed the expected theme, demo counts, mobile compact navbar, and no horizontal page overflow at 1440px and 375px.

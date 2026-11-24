@@ -6,11 +6,11 @@ Kho keybox với kiểm tra chuỗi chứng chỉ, ưu tiên RKP, sửa XML và 
 
 Ảnh chụp giao diện với dữ liệu minh họa, không chứa thông tin đăng nhập hoặc keybox thật.
 
-### Desktop
-![Giao diện desktop](docs/previews/desktop.png)
+### Desktop — giao diện tối
+![Trang chủ Keybox Hub trên desktop ở chế độ tối](docs/previews/desktop.png)
 
-### Mobile
-<img src="docs/previews/mobile.png" alt="Giao diện mobile" width="375">
+### Mobile — giao diện sáng, thanh điều hướng thu gọn
+<img src="docs/previews/mobile.png" alt="Trang chủ Keybox Hub trên mobile với thanh điều hướng thu gọn" width="375">
 
 ## Chạy dự án
 
