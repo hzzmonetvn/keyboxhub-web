@@ -187,7 +187,7 @@ button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
   transform: translateY(8px);
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--bg-surface-elevated) 85%, transparent);
+  background: color-mix(in srgb, var(--bg-surface-elevated) 70%, transparent);
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(18px);
 }
@@ -216,7 +216,7 @@ button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
   font-size: 13px;
   font-weight: 500;
   color: var(--text-muted);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-md);
   white-space: nowrap;
   transition: color 0.15s ease, background-color 0.15s ease;
 }
