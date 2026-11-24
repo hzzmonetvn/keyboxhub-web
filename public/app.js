@@ -132,6 +132,8 @@ const translations = {
     thSrcStatus: "Trạng thái quét",
     thSrcLast: "Lần quét gần nhất",
     loadingSources: "Đang tải danh sách nguồn...",
+    apiCopy: "Sao chép",
+    apiCopySuccess: "Đã sao chép ví dụ cURL.",
     apiDocsTitle: "Tích hợp theo cách của bạn",
     apiDocsDesc: "Kết nối Keybox Hub với script, module Magisk hoặc KernelSU qua REST API.",
     apiDescDownload: "Tải ngẫu nhiên 1 file keybox.xml khả dụng (Ưu tiên Strong → Device)",
@@ -325,6 +327,8 @@ const translations = {
     thSrcStatus: "Scan Status",
     thSrcLast: "Last Scanned",
     loadingSources: "Loading sources list...",
+    apiCopy: "Copy",
+    apiCopySuccess: "cURL example copied.",
     apiDocsTitle: "Build it into your workflow",
     apiDocsDesc: "Connect Keybox Hub to your scripts, Magisk or KernelSU modules with the REST API.",
     apiDescDownload: "Download a random valid keybox.xml (Strong → Device priority)",
@@ -995,14 +999,15 @@ async function loadSources() {
 }
 
 // Copy plain text utility
-window.copyText = function(text) {
+window.copyText = async function(text, successMessage) {
   if (!text) return;
-  navigator.clipboard.writeText(text)
-    .then(() => {
-      const displayTxt = text.length > 45 ? text.substring(0, 42) + "..." : text;
-      showToast(`${t("copiedIdToast")}"${displayTxt}"`, "success");
-    })
-    .catch(() => showToast(currentLang === "vi" ? "Không thể sao chép văn bản" : "Failed to copy text", "error"));
+  try {
+    await navigator.clipboard.writeText(text);
+    const displayTxt = text.length > 45 ? text.substring(0, 42) + "..." : text;
+    showToast(successMessage ?? `${t("copiedIdToast")}"${displayTxt}"`, "success");
+  } catch {
+    showToast(currentLang === "vi" ? "Không thể sao chép văn bản" : "Failed to copy text", "error");
+  }
 };
 
 // Global click delegation for [data-copy]
@@ -1011,6 +1016,11 @@ document.addEventListener("click", e => {
   if (b && b.dataset.copy !== undefined) {
     copyText(b.dataset.copy);
   }
+});
+
+document.querySelectorAll(".api-copy-btn").forEach(button => {
+  const snippet = button.closest(".api-endpoint-card").querySelector(".api-snippet-block code");
+  button.addEventListener("click", () => copyText(snippet.textContent, t("apiCopySuccess")));
 });
 
 // Copy XML of a specific key

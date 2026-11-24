@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=9.1" />
+    <link rel="stylesheet" href="style.css?v=9.2" />
     <script>
       (() => {
         try {
@@ -623,6 +623,7 @@
                 <code>/api/download</code>
               </div>
               <span class="section-desc" data-i18n="apiDescDownload">Tải ngẫu nhiên 1 file keybox.xml khả dụng (Ưu tiên Strong &rarr; Device)</span>
+              <button type="button" class="btn btn-secondary btn-sm api-copy-btn" data-i18n="apiCopy">Sao chép</button>
             </div>
             <pre class="api-snippet-block"><code># Tải file mặc định (Ưu tiên Strong RKP):
 curl -L -o keybox.xml https://keybox.hzzmonet.io.vn/api/download
@@ -639,6 +640,7 @@ curl -L -o keybox_hw.xml "https://keybox.hzzmonet.io.vn/api/download?profile=hw"
                 <code>/api/status</code>
               </div>
               <span class="section-desc" data-i18n="apiDescStatus">Thống kê trạng thái và danh sách metadata keybox (profile, rkp, certs)</span>
+              <button type="button" class="btn btn-secondary btn-sm api-copy-btn" data-i18n="apiCopy">Sao chép</button>
             </div>
             <pre class="api-snippet-block"><code>curl https://keybox.hzzmonet.io.vn/api/status</code></pre>
           </div>
@@ -650,6 +652,7 @@ curl -L -o keybox_hw.xml "https://keybox.hzzmonet.io.vn/api/download?profile=hw"
                 <code>/api/repair</code>
               </div>
               <span class="section-desc" data-i18n="apiDescRepair">Sửa lỗi & chuẩn hóa keybox (sắp xếp chuỗi cert, bổ sung Google Root, ngắt dòng 64 ký tự PEM)</span>
+              <button type="button" class="btn btn-secondary btn-sm api-copy-btn" data-i18n="apiCopy">Sao chép</button>
             </div>
             <pre class="api-snippet-block"><code>curl -F "file=@broken_keybox.xml" "https://keybox.hzzmonet.io.vn/api/repair?download=true" -o keybox_repaired.xml</code></pre>
           </div>
@@ -661,6 +664,7 @@ curl -L -o keybox_hw.xml "https://keybox.hzzmonet.io.vn/api/download?profile=hw"
                 <code>/api/upload</code>
               </div>
               <span class="section-desc" data-i18n="apiDescUpload">Upload đơn lẻ, nhiều file, ZIP hoặc qua link URL</span>
+              <button type="button" class="btn btn-secondary btn-sm api-copy-btn" data-i18n="apiCopy">Sao chép</button>
             </div>
             <pre class="api-snippet-block"><code>curl -F "files=@my_keybox.xml" https://keybox.hzzmonet.io.vn/api/upload</code></pre>
           </div>
@@ -691,6 +695,6 @@ curl -L -o keybox_hw.xml "https://keybox.hzzmonet.io.vn/api/download?profile=hw"
 
     <script src="/ads.js" defer data-cfasync="false"></script>
     <script src="site-ui.js?v=1.2"></script>
-    <script src="app.js?v=9.0"></script>
+    <script src="app.js?v=9.2"></script>
   </body>
 </html>

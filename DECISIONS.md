@@ -321,3 +321,8 @@
 - **Considered & Rejected**: Shrinking the header's space in the page would move content during the transition. Duplicating the navigation would require synchronizing active links and controls. A fixed compact frame also keeps keyboard focus inside the open panel from scrolling the document back to the top.
 - **Verification**: 56 automated tests passed. Chromium checked eight viewport widths in Vietnamese dark mode and English light mode, stable page layout, menu focus and dismissal, anchor visibility, and theme and language controls.
 - **Visual follow-up**: Increased the navigation links' corner radius from 6px to 12px, keeping action buttons pill-shaped. Reduced the compact bar's background opacity from 85% to 70% without fading its text or changing the backdrop blur. Applying opacity to the entire bar would also fade its controls.
+
+## 28. Copy API examples (2026-11-24)
+- **Chosen**: Add a bilingual copy button to each API example header. Reuse the existing clipboard helper and toast, reading the full displayed code so multi-line examples keep their formatting.
+- **Considered & Rejected**: Storing commands again in button attributes would allow the copied and displayed versions to drift.
+- **Verification**: 56 automated tests passed. Chromium verified all four clipboard values, keyboard activation, both languages, layouts at 320px and 1440px, and feedback when clipboard access was denied or unavailable.
