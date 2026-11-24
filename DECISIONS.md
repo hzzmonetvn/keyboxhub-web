@@ -309,3 +309,9 @@
   - 56/56 automated unit/integration tests passing (`npm test`).
   - Syntax verified with `node --check public/app.js` and `node --check public/site-ui.js`.
   - Service restarted (`systemctl restart keybox.service`) and confirmed HTTP 200 response on port 8098.
+
+## 26. Public homepage inspired by Harness (2026-11-24)
+- **Chosen**: A centered introduction and repository link above a single live status panel. The status summary and four labeled values share one frame instead of competing as separate cards. A steel-blue backdrop, quieter controls, and consistent section headings carry the layout through the tools, tables, and API reference.
+- **Preserved**: Existing dashboard data bindings, API routes, administrator-managed accent and background media, the Auto/Light/Dark cycle, and a separate admin interface. Mobile navigation wraps within the screen; wide tables keep their own scroll areas.
+- **Considered & Rejected**: A static product preview would duplicate the real dashboard and could drift from the current state. Forcing the reference's dark theme would discard visitor preferences. Replacing the existing navigation and form logic was unnecessary for the visual change.
+- **Verification**: 56 automated tests passed. An isolated Chromium run checked live status and table data, the repository anchor, search and filtering, upload and repair tab switching, both languages, theme persistence and OS-driven switching. Navigation was checked from 320 to 1440 pixels at ten viewport widths.

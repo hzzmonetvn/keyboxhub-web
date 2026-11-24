@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=8.8" />
+    <link rel="stylesheet" href="style.css?v=8.9" />
     <script>
       (() => {
         try {
@@ -107,106 +107,68 @@
     </header>
 
     <main class="container main-content" id="overview">
-      <!-- HERO BENTO GRID -->
-      <section class="hero-bento-grid" aria-label="System Overview">
-        <!-- Main Status Bento Item -->
-        <div class="bento-card hero-main-card">
-          <div>
-            <div class="hero-header-row">
-              <div class="section-eyebrow">Keybox Attestation Pipeline</div>
-              <div id="system-status-badge" class="hero-badge-pill status-badge status-loading">
-                <span class="pulse-dot"></span>
-                <span id="system-status-text" data-i18n="statusChecking">Đang kiểm tra...</span>
-              </div>
-            </div>
+      <section class="hero-intro" aria-labelledby="page-title">
+        <h1 class="hero-title" id="page-title" data-i18n="pageTitle">Trung tâm Keybox</h1>
+        <p class="hero-intro-text" data-i18n="pageIntro">Theo dõi trạng thái chứng chỉ, tìm và chia sẻ keybox trong cùng một nơi.</p>
+        <a href="#repository" class="btn hero-cta">
+          <span data-i18n="heroRepository">Xem kho keybox</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14m-5-5 5 5 5-5"></path>
+          </svg>
+        </a>
+      </section>
 
-            <h1 class="hero-title" data-i18n="pageTitle">Trung tâm Keybox</h1>
+      <section class="bento-card status-workspace" aria-labelledby="workspace-title">
+        <div class="workspace-header">
+          <h2 id="workspace-title" data-i18n="navOverview">Tổng quan</h2>
+          <div id="system-status-badge" class="status-badge status-loading" role="status">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <span id="system-status-text" data-i18n="statusChecking">Đang kiểm tra...</span>
+          </div>
+        </div>
+        <div class="workspace-body">
+          <div class="workspace-summary">
+            <h3 data-i18n="heroSubtitleText">Trạng thái cấp phát hiện tại</h3>
             <p id="system-status-desc" class="hero-description" data-i18n="heroConnecting">
               Đang kết nối tới máy chủ Google Attestation và hệ thống quản lý keybox...
             </p>
+            <dl class="hero-meta-strip">
+              <div class="hero-meta-item">
+                <dt data-i18n="metaUpdated">Cập nhật:</dt>
+                <dd id="last-updated-time">---</dd>
+              </div>
+              <div class="hero-meta-item">
+                <dt data-i18n="metaAutoLoot">Quét nguồn:</dt>
+                <dd id="last-looted-time">---</dd>
+              </div>
+              <div class="hero-meta-item">
+                <dt data-i18n="metaCycle">Chu kỳ:</dt>
+                <dd data-i18n="metaCycleVal">Mỗi giờ</dd>
+              </div>
+            </dl>
           </div>
-
-          <div class="hero-meta-strip">
-            <div class="hero-meta-item">
-              <span data-i18n="metaUpdated">Cập nhật:</span>
-              <strong id="last-updated-time">---</strong>
+          <dl class="workspace-metrics">
+            <div class="workspace-metric metric-strong">
+              <dt data-i18n="statStrong">Strong Integrity</dt>
+              <dd class="stat-num" id="stat-strong">0</dd>
+              <dd class="stat-sub" data-i18n="statStrongHint">Ưu tiên cấp phát</dd>
             </div>
-            <div class="hero-meta-item">
-              <span data-i18n="metaAutoLoot">Quét nguồn:</span>
-              <strong id="last-looted-time">---</strong>
+            <div class="workspace-metric metric-device">
+              <dt data-i18n="statDevice">Device Integrity</dt>
+              <dd class="stat-num" id="stat-device">0</dd>
+              <dd class="stat-sub" data-i18n="statDeviceHint">Dự phòng khi hết Strong</dd>
             </div>
-            <div class="hero-meta-item">
-              <span data-i18n="metaCycle">Chu kỳ:</span>
-              <strong data-i18n="metaCycleVal">Mỗi giờ</strong>
+            <div class="workspace-metric metric-banned">
+              <dt data-i18n="statBanned">Đã thu hồi</dt>
+              <dd class="stat-num" id="stat-banned">0</dd>
+              <dd class="stat-sub" data-i18n="statBannedHint">Tự động xóa ngay lập tức</dd>
             </div>
-          </div>
-        </div>
-
-        <!-- 4 Metric Bento Cards -->
-        <div class="bento-card stat-bento-card stat-strong-card">
-          <div class="stat-top">
-            <span class="stat-icon-wrap">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </span>
-            <span class="badge-tag badge-strong">Tier 1</span>
-          </div>
-          <div class="stat-num text-success" id="stat-strong">0</div>
-          <div class="stat-label-wrap">
-            <div class="stat-name" data-i18n="statStrong">Strong Integrity</div>
-            <div class="stat-sub" data-i18n="statStrongHint">Ưu tiên cấp phát</div>
-          </div>
-        </div>
-
-        <div class="bento-card stat-bento-card stat-device-card">
-          <div class="stat-top">
-            <span class="stat-icon-wrap">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8">
-                <circle cx="12" cy="12" r="9"></circle>
-                <path d="M12 8v4l2.5 2.5"></path>
-              </svg>
-            </span>
-            <span class="badge-tag badge-device">Fallback</span>
-          </div>
-          <div class="stat-num text-warning" id="stat-device">0</div>
-          <div class="stat-label-wrap">
-            <div class="stat-name" data-i18n="statDevice">Device Integrity</div>
-            <div class="stat-sub" data-i18n="statDeviceHint">Dự phòng khi hết Strong</div>
-          </div>
-        </div>
-
-        <div class="bento-card stat-bento-card stat-rkp-card">
-          <div class="stat-top">
-            <span class="stat-icon-wrap">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-              </svg>
-            </span>
-            <span class="badge-tag badge-banned">Banned</span>
-          </div>
-          <div class="stat-num text-cyan" id="stat-banned">0</div>
-          <div class="stat-label-wrap">
-            <div class="stat-name" data-i18n="statBanned">Đã Thu Hồi</div>
-            <div class="stat-sub" data-i18n="statBannedHint">Tự động xóa ngay lập tức</div>
-          </div>
-        </div>
-
-        <div class="bento-card stat-bento-card stat-total-card">
-          <div class="stat-top">
-            <span class="stat-icon-wrap">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-              </svg>
-            </span>
-            <span class="badge-tag">Inventory</span>
-          </div>
-          <div class="stat-num text-primary" id="stat-total">0</div>
-          <div class="stat-label-wrap">
-            <div class="stat-name" data-i18n="statTotal">Tổng Keybox</div>
-            <div class="stat-sub" data-i18n="statTotalHint">Tất cả key trong hệ thống</div>
-          </div>
+            <div class="workspace-metric">
+              <dt data-i18n="statTotal">Tổng keybox</dt>
+              <dd class="stat-num" id="stat-total">0</dd>
+              <dd class="stat-sub" data-i18n="statTotalHint">Tất cả key trong hệ thống</dd>
+            </div>
+          </dl>
         </div>
       </section>
 
@@ -224,7 +186,7 @@
                 </svg>
               </div>
               <div>
-                <h3 data-i18n="downloadTitle">Cấp Phát & Tải Keybox</h3>
+                <h2 data-i18n="downloadTitle">Cấp Phát & Tải Keybox</h2>
                 <p data-i18n="downloadDesc">
                   Nhận keybox khả dụng đã kiểm tra chứng chỉ và chèn watermark xác thực.
                 </p>
@@ -319,7 +281,7 @@
                 </svg>
               </div>
               <div>
-                <h3 data-i18n="uploadTitle">Đóng Góp Keybox</h3>
+                <h2 data-i18n="uploadTitle">Đóng Góp Keybox</h2>
                 <p data-i18n="uploadDesc">
                   Tự động kiểm tra chữ ký mật mã, đối chiếu Google CRL và tự nâng cấp nếu chất lượng cao hơn.
                 </p>
@@ -402,7 +364,7 @@
       <!-- Analysis Result Modal / Card -->
       <section id="analysis-result-panel" class="bento-card panel-analysis hidden">
         <div class="modal-header-row">
-          <h3 class="panel-title" data-i18n="resultTitle">Kết Quả Kiểm Tra Chi Tiết</h3>
+          <h2 class="panel-title" data-i18n="resultTitle">Kết Quả Kiểm Tra Chi Tiết</h2>
           <button class="btn btn-secondary btn-sm" id="btn-close-result" title="Đóng">Đóng ✕</button>
         </div>
         <div id="analysis-result-body"></div>
@@ -413,7 +375,7 @@
         <div class="table-toolbar">
           <div>
             <div class="table-title-group">
-              <h3 class="table-title" data-i18n="tableTitle">Kho Keybox</h3>
+              <h2 class="table-title" data-i18n="tableTitle">Kho Keybox</h2>
               <span id="keys-count" class="count-badge">—</span>
             </div>
             <p class="section-desc" data-i18n="tableSubtitle">
@@ -475,7 +437,7 @@
             </svg>
           </div>
           <div>
-            <h3 data-i18n="repairTitle">Sửa Lỗi & Chuẩn Hóa Keybox</h3>
+            <h2 data-i18n="repairTitle">Sửa Lỗi & Chuẩn Hóa Keybox</h2>
             <p data-i18n="repairDesc">
               Tự động sắp xếp chuỗi chứng chỉ (Leaf → Intermediate → Root), bổ sung Google Attestation Root CA, chuẩn hóa PEM 64 ký tự để tương thích 100% TrickyStore, APatch, KernelSU.
             </p>
@@ -571,7 +533,7 @@
       <section class="bento-card table-card" id="sources">
         <div class="table-toolbar">
           <div>
-            <h3 class="table-title" data-i18n="sourcesTitle">Nguồn Keybox Bên Thứ 3</h3>
+            <h2 class="table-title" data-i18n="sourcesTitle">Nguồn Keybox Bên Thứ 3</h2>
             <p class="section-desc" data-i18n="sourcesDesc">
               Hệ thống tự động quét mỗi giờ: nạp key hợp lệ, tự động bỏ qua trùng lặp.
             </p>
@@ -613,7 +575,7 @@
       <section class="bento-card table-card" id="logs">
         <div class="table-toolbar">
           <div>
-            <h3 style="font-size: 18px; font-weight: 700;" data-i18n="logsTitle">Log gần đây</h3>
+            <h2 class="table-title" data-i18n="logsTitle">Log gần đây</h2>
             <p class="section-desc" data-i18n="logsDesc">10 sự kiện mới nhất trên toàn hệ thống.</p>
           </div>
         </div>
@@ -640,7 +602,7 @@
             </svg>
           </div>
           <div>
-            <h3 data-i18n="apiDocsTitle">Tài Liệu API & Tích Hợp</h3>
+            <h2 data-i18n="apiDocsTitle">Tài Liệu API & Tích Hợp</h2>
             <p data-i18n="apiDocsDesc">Kết nối Keybox Hub với script, module Magisk, KernelSU, TrickyStore hoặc Kaorios Toolbox.</p>
           </div>
         </div>
@@ -721,6 +683,6 @@ curl -L -o keybox_hw.xml "https://keybox.hzzmonet.io.vn/api/download?profile=hw"
 
     <script src="/ads.js" defer data-cfasync="false"></script>
     <script src="site-ui.js?v=1.2"></script>
-    <script src="app.js?v=8.8"></script>
+    <script src="app.js?v=8.9"></script>
   </body>
 </html>
